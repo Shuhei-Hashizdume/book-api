@@ -26,13 +26,13 @@ Codexは学習・開発を再開するとき、このファイルを確認し、
 
 ## 現在のPhase
 
-Phase 3：最初のBook機能を作る
+Phase 6：Book CRUDを完成させる
 
 ## 現在のStep
 
-Step 3-1：Bookに必要なデータを考える。
+Step 6-1：Book作成。
 
-まだアプリケーションの実装は開始していません。
+アプリケーションの実装を開始しています。
 
 ---
 
@@ -91,6 +91,37 @@ Phase 2 / Step 2-4で、FastAPIはHTTPメソッドとURLパスの組み合わせ
 Phase 2 / Step 2-5でSwagger UIから `GET /` を実行し、
 ステータス200と期待したJSONレスポンスを確認しました。
 
+Phase 3 / Step 3-1で、最初のBookは `id`、`title`、`author`、任意の `isbn` を
+持つことと、本を大量に事前登録しない方針を決めました。
+
+Phase 3 / Step 3-2で、固定した『GANTZ 1』の4項目を返す
+`GET /books/1` を作り、Swagger UIでステータス200とJSONを確認しました。
+
+ローカル開発でUvicornを起動するときは、コード変更後の手動再起動を避けるため、
+`python -m uvicorn main:app --reload` を使用します。
+
+Phase 3 / Step 3-3で、3冊の固定Bookを `books` リストへまとめ、
+`GET /books` がJSON配列を返すことをSwagger UIで確認しました。
+
+Phase 3 / Step 3-4からPhase 4 / Step 4-1で、実行中のメモリへ追加したBookは
+アプリ停止時に消えるため、永続保存するDBが必要だと確認しました。
+
+Phase 4 / Step 4-2で、複数ユーザー、本番運用、データ間の関係や制約を扱う
+サービス要件を踏まえ、PostgreSQLを採用しました。
+
+Phase 4 / Step 4-3からStep 4-4で、`book_api`と専用ユーザーを作成し、
+Pydantic Settings、SQLAlchemy、Psycopgを通した接続に成功しました。
+
+Phase 4 / Step 4-5で、SQLAlchemyの `DeclarativeBase` を引き継ぐ
+共通の `Base` と、`books` テーブルに対応する `Book` モデルを作成しました。
+`id`、`title`、`author`、`isbn` の設計情報がSQLAlchemyへ登録されたことを
+Python上で確認しました。PostgreSQLへのテーブル作成はまだ行っていません。
+
+Phase 5 / Step 5-1からStep 5-5でAlembic 1.19.1を導入・初期化し、
+`Base.metadata`とPostgreSQLを比較して最初のマイグレーションを作成しました。
+マイグレーションを適用し、`books`と`alembic_version`が作成されたこと、
+`books`のカラム・主キー・ISBNの重複禁止制約がモデルと一致することを確認しました。
+
 ローカルの `main` ブランチはGitHubの `origin/main` に接続済みで、
 プロジェクト管理文書の初回コミットを送信済みです。
 
@@ -98,15 +129,15 @@ Phase 2 / Step 2-5でSwagger UIから `GET /` を実行し、
 
 # 現在行っていること
 
-DBを導入する前に、Bookを識別して扱うために必要な
-最低限のデータ項目を考えます。
+固定したPythonリストではなく、PostgreSQLの `books` テーブルへ
+新しいBookを保存するAPIを一つずつ作ります。
 
 ---
 
 # 次に行うこと
 
-ROADMAPのPhase 3 / Step 3-1に従い、本を識別する情報、タイトル、著者などから、
-最初のBookデータに必要な項目を決めます。
+ROADMAPのPhase 6 / Step 6-1に従い、FastAPIのPOST処理から
+SQLAlchemyを通してBookを1冊登録する流れを考えます。
 
 ---
 
@@ -114,13 +145,13 @@ ROADMAPのPhase 3 / Step 3-1に従い、本を識別する情報、タイトル�
 
 次回このプロジェクトを再開する場合は、
 
-**Phase 3 / Step 3-1：Bookに必要なデータを考える**
+**Phase 6 / Step 6-1：Book作成**
 
 から再開してください。
 
 現在の具体的な次の作業は、
 
-**最初のBookデータに必要な項目を考えること**
+**APIから受け取ったBookをPostgreSQLへ保存するために必要な処理を整理すること**
 
 です。
 
