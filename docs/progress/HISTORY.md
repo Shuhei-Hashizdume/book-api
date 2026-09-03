@@ -643,3 +643,87 @@ Gitの追跡対象から除外するという役割の違いを確認した。
 
 Phase 1の開発環境準備は完了。
 次はPhase 2 / Step 2-1で、`main.py` に最小のFastAPIアプリを作る。
+
+### Phase 2 / Step 2-1：最小のFastAPIアプリを作る
+
+#### 実施内容
+
+リポジトリ直下に `main.py` を作成した。
+
+FastAPIパッケージから `FastAPI` を読み込み、アプリ本体を作成した。
+さらに、`GET /` と `read_root` 関数を結び付け、
+`{"message": "book-api"}` を返す最小のAPIを定義した。
+
+#### 学んだこと
+
+`FastAPI()` はアプリ本体を作り、`app` という名前に結び付ける。
+`@app.get("/")` は、`GET /` を受け取ったときに直下の関数を
+実行するという対応関係をFastAPIへ登録する。
+
+この時点ではAPIの処理は定義されているが、外部通信を受け取る
+Uvicornはまだ起動していない。
+
+#### 次につながること
+
+Phase 2 / Step 2-2でUvicornを起動し、`main.py` のFastAPIアプリを読み込ませる。
+
+### Phase 2 / Step 2-2からStep 2-3：起動とブラウザからのアクセス
+
+#### 実施内容
+
+`python -m uvicorn main:app` でUvicornを起動した。
+
+ブラウザから `http://127.0.0.1:8000/` へアクセスし、
+`{"message": "book-api"}` が表示されることを確認した。
+
+#### 学んだこと
+
+Uvicornは8000番ポートでHTTPリクエストを受け取り、FastAPIへ渡す。
+FastAPIは `GET /` に登録された `read_root` 関数を実行し、
+関数が返したPythonの辞書をJSONレスポンスへ変換する。
+
+Uvicornは、そのレスポンスをブラウザへ送り返す。
+
+#### 次につながること
+
+Phase 2 / Step 2-4で、URLとHTTPメソッドがPython関数へ
+どのように結び付けられているか整理する。
+
+### Phase 2 / Step 2-4：FastAPIのルーティングを理解する
+
+#### 学んだこと
+
+FastAPIは、HTTPメソッドとURLパスの組み合わせを、実行するPython関数と結び付ける。
+
+登録されていないURLパスへのリクエストには404 Not Foundを返す。
+URLパスは登録されていても、そのHTTPメソッドが許可されていない場合は
+405 Method Not Allowedを返す。
+
+また、Uvicornを `--reload` なしで起動している場合、`main.py` を変更しても
+起動中のアプリには自動反映されず、停止と再起動が必要になる。
+
+#### 次につながること
+
+Phase 2 / Step 2-5で、FastAPIが自動生成するSwagger UIを確認する。
+
+### Phase 2 / Step 2-5：Swagger UIを確認する
+
+#### 実施内容
+
+ブラウザで `/docs` を開き、Swagger UIに `GET /` が表示されることを確認した。
+
+`Try it out`からAPIを実行し、HTTPステータス200と、
+期待したレスポンス本文が表示されることを確認した。
+
+#### 学んだこと
+
+Swagger UIは、FastAPIに登録されたAPIの情報を画面で確認し、
+ブラウザからリクエストを試行するための仕組みである。
+
+`Try it out`による実行でも、UvicornがHTTPリクエストを受け取り、
+FastAPIが対象関数を実行してレスポンスを返す流れは通常のアクセスと同じである。
+
+#### 次につながること
+
+Phase 2は完了。
+次はPhase 3 / Step 3-1で、Bookを扱うために必要なデータを考える。

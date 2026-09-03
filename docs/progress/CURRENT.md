@@ -26,11 +26,11 @@ Codexは学習・開発を再開するとき、このファイルを確認し、
 
 ## 現在のPhase
 
-Phase 2：最小のWeb APIを作る
+Phase 3：最初のBook機能を作る
 
 ## 現在のStep
 
-Step 2-1：最小のFastAPIアプリを作る。
+Step 3-1：Bookに必要なデータを考える。
 
 まだアプリケーションの実装は開始していません。
 
@@ -79,6 +79,18 @@ Phase 1 / Step 1-6で、最初はリポジトリ直下の `main.py` だけで始
 Phase 1 / Step 1-7で、プロジェクト直下の `.gitignore` に `.venv/` を記録し、
 仮想環境をGit管理から除外する方針を確認しました。
 
+Phase 2 / Step 2-1で、`main.py` にFastAPIアプリ本体、`GET /` のルート、
+辞書を返す `read_root` 関数を作成しました。
+
+Phase 2 / Step 2-2からStep 2-3でUvicornを起動し、ブラウザから `GET /` を送り、
+`{"message": "book-api"}` が表示されることを確認しました。
+
+Phase 2 / Step 2-4で、FastAPIはHTTPメソッドとURLパスの組み合わせから
+実行する関数を選び、未登録パスは404、許可されないメソッドは405を返すと確認しました。
+
+Phase 2 / Step 2-5でSwagger UIから `GET /` を実行し、
+ステータス200と期待したJSONレスポンスを確認しました。
+
 ローカルの `main` ブランチはGitHubの `origin/main` に接続済みで、
 プロジェクト管理文書の初回コミットを送信済みです。
 
@@ -86,14 +98,15 @@ Phase 1 / Step 1-7で、プロジェクト直下の `.gitignore` に `.venv/` �
 
 # 現在行っていること
 
-`main.py` に `GET /` へ応答する最小のFastAPIアプリを作ります。
+DBを導入する前に、Bookを識別して扱うために必要な
+最低限のデータ項目を考えます。
 
 ---
 
 # 次に行うこと
 
-ROADMAPのPhase 2 / Step 2-1に従い、FastAPIアプリが何から構成されるかを
-1つずつ理解しながら実装します。
+ROADMAPのPhase 3 / Step 3-1に従い、本を識別する情報、タイトル、著者などから、
+最初のBookデータに必要な項目を決めます。
 
 ---
 
@@ -101,13 +114,13 @@ ROADMAPのPhase 2 / Step 2-1に従い、FastAPIアプリが何から構成され
 
 次回このプロジェクトを再開する場合は、
 
-**Phase 2 / Step 2-1：最小のFastAPIアプリを作る**
+**Phase 3 / Step 3-1：Bookに必要なデータを考える**
 
 から再開してください。
 
 現在の具体的な次の作業は、
 
-**`main.py` に最小のFastAPIアプリを作ること**
+**最初のBookデータに必要な項目を考えること**
 
 です。
 
