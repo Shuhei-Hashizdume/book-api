@@ -30,7 +30,7 @@ Phase 6：Book CRUDを完成させる
 
 ## 現在のStep
 
-Step 6-1：Book作成。
+Step 6-2：Book一覧取得。
 
 アプリケーションの実装を開始しています。
 
@@ -122,6 +122,10 @@ Phase 5 / Step 5-1からStep 5-5でAlembic 1.19.1を導入・初期化し、
 マイグレーションを適用し、`books`と`alembic_version`が作成されたこと、
 `books`のカラム・主キー・ISBNの重複禁止制約がモデルと一致することを確認しました。
 
+Phase 6 / Step 6-1で、`BookCreate`による入力検証、リクエストごとのSession、
+Book用ルーター、`POST /books`を実装しました。Swagger UIでステータス201と
+自動生成されたIDを含むレスポンスを確認し、PostgreSQLへの保存も確認しました。
+
 ローカルの `main` ブランチはGitHubの `origin/main` に接続済みで、
 プロジェクト管理文書の初回コミットを送信済みです。
 
@@ -129,15 +133,15 @@ Phase 5 / Step 5-1からStep 5-5でAlembic 1.19.1を導入・初期化し、
 
 # 現在行っていること
 
-固定したPythonリストではなく、PostgreSQLの `books` テーブルへ
-新しいBookを保存するAPIを一つずつ作ります。
+固定したPythonリストを返している `GET /books` を、PostgreSQLの
+`books`テーブルから一覧を取得する処理へ変更します。
 
 ---
 
 # 次に行うこと
 
-ROADMAPのPhase 6 / Step 6-1に従い、FastAPIのPOST処理から
-SQLAlchemyを通してBookを1冊登録する流れを考えます。
+ROADMAPのPhase 6 / Step 6-2に従い、SQLAlchemyで複数のBookを
+取得し、FastAPIから一覧として返す流れを考えます。
 
 ---
 
@@ -145,13 +149,13 @@ SQLAlchemyを通してBookを1冊登録する流れを考えます。
 
 次回このプロジェクトを再開する場合は、
 
-**Phase 6 / Step 6-1：Book作成**
+**Phase 6 / Step 6-2：Book一覧取得**
 
 から再開してください。
 
 現在の具体的な次の作業は、
 
-**APIから受け取ったBookをPostgreSQLへ保存するために必要な処理を整理すること**
+**固定した `books` リストをDBからの一覧取得へ置き換えること**
 
 です。
 

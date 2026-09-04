@@ -597,6 +597,23 @@ PostgreSQL
 
 POSTによるBook登録を実装します。
 
+POSTでは入力データの形と検証がこの時点で必要になるため、
+入力用の最小限のPydanticスキーマ `BookCreate` を先に導入します。
+
+ここではCreate / Update / Responseを一度にすべて作らず、
+Book作成に必要な入力だけを定義します。
+
+CRUDとPhase 7で複数のスキーマが必要になることが明確なため、
+一時的に `main.py` へ置かず、最初から `schemas.py` へ定義します。
+ドメインごとのディレクトリ分割は、さらに規模が大きくなった段階で検討します。
+
+Book CRUDで複数のエンドポイントが続けて増えることも明確なため、
+Book関連のエンドポイントは `routers/books.py` へ配置します。
+Sessionの依存性は今後ほかのルーターでも利用するため、
+`dependencies.py` から共有します。
+
+この段階では、必要性がまだないservice層やCRUD層までは追加しません。
+
 
 ## Step 6-2：Book一覧取得
 
@@ -643,6 +660,9 @@ CRUDを作る中で、
 
 という問題を考えます。
 
+Step 6-1で導入した最小限の `BookCreate` を出発点として、
+作成・更新・レスポンスで必要なデータの違いを整理します。
+
 
 ## Step 7-1：request bodyを整理する
 
@@ -668,9 +688,15 @@ CRUDを作る中で、
 
 ## Step 8-1：routerを分離する必要性を考える
 
+Step 6-1で作成した `routers/books.py` を出発点として、
+Userや投稿など別の機能をどの単位でルーターへ分離するかを整理します。
+
 ## Step 8-2：modelsを整理する
 
 ## Step 8-3：schemasを整理する
+
+Step 6-1で作成した `schemas.py` の責務が増えている場合は、
+Book、Userなどの単位で分割する必要性を検討します。
 
 ## Step 8-4：DB関連処理を整理する
 
