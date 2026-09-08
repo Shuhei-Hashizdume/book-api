@@ -1028,3 +1028,445 @@ FastAPIの依存性注入により、各リクエストへSessionを渡し、
 
 Phase 6 / Step 6-2で、固定したPythonリストではなく、
 PostgreSQLからBook一覧を取得する処理へ変更する。
+
+### Phase 6 / Step 6-2：Book一覧取得
+
+#### 実施内容
+
+`GET /books` が固定したPythonリストではなく、PostgreSQLの
+`books`テーブルからBook一覧を取得して返すように変更した。
+
+`select(Book)`で取得する対象を表す問い合わせを作成し、
+`Session.scalars()`でその問い合わせを実行し、`.all()`で全Bookを取り出した。
+
+Swagger UIで `GET /books` を実行し、以前PostgreSQLへ登録した
+Bookがレスポンスに含まれることを確認した。
+
+#### 学んだこと
+
+`select(Book)`は問い合わせ内容を作る段階であり、その時点では
+PostgreSQLへの問い合わせは実行されない。`Session.scalars(statement)`を
+呼び出したときに問い合わせが実行される。
+
+SessionはDBとのやり取りの窓口だが、Sessionのメソッドを
+使うこととSQLがその場で実行されることは常に同じではない。
+
+#### 次につながること
+
+Phase 6 / Step 6-3で、URLから受け取ったIDに対応するBookを
+PostgreSQLから1件取得する処理へ変更する。
+
+### Phase 6 / Step 6-3：Book詳細取得
+
+#### 実施内容
+
+`GET /books/{book_id}` でパスパラメータの `book_id` を整数として受け取り、
+`Session.get(Book, book_id)`で主キーが一致するBookを1件取得して返すように変更した。
+
+Swagger UIでDBに存在するIDを指定し、ステータス200と、指定したIDに
+対応する `title`、`author`、`isbn` を含むBookが返ることを確認した。
+
+#### 学んだこと
+
+FastAPIは `/{book_id}` と関数引数 `book_id: int` を対応させ、URL上の値を
+整数へ変換・検証して関数へ渡す。
+
+一覧取得では `select(Book)`、`Session.scalars()`、`.all()` を使い、
+主キーを指定した1件取得では `Session.get(Book, book_id)` を使う。
+
+#### 次につながること
+
+Phase 6 / Step 6-4で、PUTとPATCHの違いを理解し、
+Book更新APIで使う方法を考える。
+
+### Book本体の管理者と一般ユーザーの操作範囲を修正
+
+#### 変更前の問題
+
+ROADMAPに「ユーザーが自分のBookだけを変更・削除できる」という記述があり、
+Book本体がユーザー所有のデータであるように読める状態だった。
+
+しかし、同じ書籍を複数ユーザーで共有するサービスで、一般ユーザーに
+Book本体の手入力・更新・削除を許可すると、入力負担、重複データ、
+書誌情報のばらつき、他ユーザーが参照するBookの変更・削除という問題が起こる。
+
+#### 変更後の設計
+
+Bookはサービス全体で共有する書籍マスタとし、一般ユーザーはBook本体を
+手入力で登録・更新・削除しない設計に変更した。
+
+将来、ユーザーが外部書籍APIの検索結果から本を選んだときは、
+バックエンドがISBNなどで既存Bookを確認し、必要な場合だけ保存する。
+ユーザーが登録・更新・削除するのは、読みたいリスト、読書記録、
+学び・気づき、評価、投稿などの自分に紐づくデータとする。
+
+Phase 6のBook CRUDは、CRUDとDB操作を学ぶための基礎実装として続け、
+最終的には運営・管理用またはシステム内部用として保護する。
+
+#### Step 6-4への影響
+
+Bookの書誌情報を一部だけ修正する運営・管理用途を想定し、
+Book更新APIにはPUTではなくPATCHを採用する。
+
+### Phase 6 / Step 6-4：Book更新
+
+#### 実施内容
+
+運営・管理側がBookの書誌情報を部分的に修正する用途として、
+`PATCH /books/{book_id}` を実装した。
+
+更新用の `BookUpdate` を作成し、`title`、`author`、`isbn` を
+未送信にできるようにしつつ、既存の文字数とISBN形式の制約を維持した。
+
+`Session.get()`で更新対象を取得し、
+`model_dump(exclude_unset=True)`で送信された項目だけを辞書にした。
+辞書の各項目を `setattr()` でBookへ反映し、`commit()` で更新を確定後、
+`refresh()` でDBの現在値を読み直して更新後のBookを返した。
+
+Swagger UIでタイトルだけをPATCHし、タイトルが変更され、
+未送信の著者とISBNは変わらないことを確認した。
+続けてGETしても更新内容が残っていることから、PostgreSQLへの保存も確認した。
+
+DB移行前に使っていたPythonの固定 `books` リストは、すべてのBook取得が
+PostgreSQLを使うようになったため削除した。DB内のBookには影響しない。
+
+#### 学んだこと
+
+PUTはリソース全体の置き換え、PATCHは送信した変更の適用を表す。
+今回はBookの一部項目を修正するためPATCHを採用した。
+
+`exclude_unset=True` は値が `None` の項目を一律に除外するのではなく、
+入力時に設定されなかった項目を除外する。そのため、未送信と
+明示的な `null` を区別できる。
+
+`setattr(target_book, field, value)` は、`field` が示す属性を
+`value` で上書きする。その時点ではPython上のBookが変更された段階であり、
+`commit()` でPostgreSQLへ更新を送って確定する。
+
+#### 次につながること
+
+Phase 6 / Step 6-5で、運営・管理用のBook削除処理を実装する。
+その後、Step 6-6で存在しないBookとPATCHの不正な `null` を含む
+異常系の処理を整理する。
+
+### Phase 6 / Step 6-5：Book削除
+
+#### 実施内容
+
+CRUD学習と運営・管理用の基礎実装として、
+`DELETE /books/{book_id}` を実装した。
+
+`Session.get(Book, book_id)`で対象を取得し、`Session.delete(target_book)`で
+Sessionの削除対象として登録後、`Session.commit()`でPostgreSQLへDELETEを送って
+削除を確定する処理を作成した。
+
+削除後に返す本文がないため、成功時のステータスを
+`204 No Content` とした。削除専用のBookを新規登録し、そのIDと内容を
+確認してからDELETEし、204とレスポンス本文がないことを確認した。
+
+#### 学んだこと
+
+`Session.delete()`は対象を削除予定としてSessionへ登録する段階であり、
+`Session.commit()`で削除をPostgreSQLへ送って確定する。
+
+Bookの行を削除しても、PostgreSQLのID発行用sequenceは過去に発行した値へ戻らない。
+そのため、同じ内容を再登録しても削除したIDは再利用されず、
+次のIDが発行される。IDは件数ではなく、データを一意に識別する値である。
+
+現時点でBookに関連テーブルはないため行を物理削除した。将来、
+読書記録や投稿がBookを参照する段階で、関連データがある場合の削除制限、
+無効化、論理削除などを要件に合わせて再設計する。
+
+#### 次につながること
+
+Phase 6 / Step 6-6で、存在しないBook IDに対するGET・PATCH・DELETEと、
+PATCHで必須項目へ明示的な `null` が送信された場合を扱う。
+
+### Phase 6 / Step 6-6：Bookの異常系処理
+
+#### 実施内容
+
+存在しないBook IDをGET・PATCH・DELETEした場合に、
+`404 Not Found` とBookが存在しないことを示す `detail` を返すようにした。
+
+`BookUpdate`にPydanticの検証を追加し、`title`・`author`への
+明示的な `null` と、更新項目が1つもないrequest bodyを
+`422 Unprocessable Content` で拒否するようにした。
+
+POST・PATCHで既存と同じISBNを保存すると、PostgreSQLのUNIQUE制約違反が
+SQLAlchemyの `IntegrityError` として通知される。これを `db.commit()` の周囲で
+捕捉し、`db.rollback()` 後に利用者向けの `409 Conflict` へ変換した。
+
+Swagger UIで各異常系のステータスとレスポンスを確認し、
+重複POSTで新しいBookが登録されないこと、重複PATCHで元のISBNが
+維持されることもGETで確認した。
+
+#### 学んだこと
+
+Pydanticはrequest bodyの形式・型・個々の検証を担当するが、
+DBに現在何が保存されているかまでは判断しない。
+一方、UNIQUE制約は同時リクエストがあってもDB自身が重複を防ぐ。
+
+`IntegrityError` はDBの整合性制約違反をアプリ内部へ伝える例外で、
+`HTTPException` はその原因をHTTPステータスと利用者向けの説明に変換する。
+`commit()` が失敗したSessionは、後続のDB操作前に `rollback()` が必要になる。
+
+#### 次につながること
+
+Phase 7 / Step 7-1で、実装済みの `BookCreate` と `BookUpdate` を比較し、
+POSTとPATCHのrequest bodyに必要な項目の違いを整理する。
+
+### Phase 7：PydanticとAPIの入出力整理
+
+#### 実施内容
+
+POSTではBookを新規作成するため `title`・`author` を必須とする
+`BookCreate` を使い、PATCHでは送信した項目だけを更新できる
+`BookUpdate` を使うという入力スキーマの役割を整理した。
+
+一般ユーザー向けの出力は `id`・`title`・`author` に絞る方針とし、
+出力専用の `BookResponse` を追加した。Bookを返すGET・POST・PATCHの
+デコレータに `response_model` を設定し、一覧取得では
+`list[BookResponse]` を使用した。DELETEは204で本文を返さないため設定していない。
+
+Swagger UIで詳細・一覧・作成・更新を確認し、DBにはISBNが保存されたまま、
+HTTPレスポンスからのみISBNが除外されることを確認した。
+
+#### 学んだこと
+
+入力スキーマはAPIが受け取る項目と検証を定義し、
+出力スキーマはAPIが外部へ公開する項目を定義する。
+同じBookでも、作成・部分更新・出力で必要な項目が異なるため、
+`BookCreate`・`BookUpdate`・`BookResponse` の3つに役割を分ける。
+
+`response_model` はDBのデータを変更するものではなく、
+関数が返したデータをHTTPレスポンスの形に変換する際に、
+スキーマに定義した項目だけに検証・フィルタリングする。
+
+#### 次につながること
+
+Phase 8 / Step 8-1で、現在の `main.py` と `routers/books.py` の役割を確認し、
+コードが増えた際にrouterを機能ごとに分ける必要性を整理する。
+
+### Phase 8：コード構成の整理
+
+#### 確認内容
+
+`main.py` はFastAPIアプリの作成とrouter登録、
+`routers/books.py` はBook関連のエンドポイントという役割に
+すでに分けられていることを確認した。
+
+DB関連も、`config.py` が設定、`database.py` がEngine・Session・Base、
+`dependencies.py` がFastAPIへSessionを渡す依存性という役割に分かれている。
+
+#### 設計判断
+
+現在はBookモデル1つ、Bookスキーマ3つの小さな構成であり、
+models・schemasをさらに分割する利益より、ファイルとimportが増える負担が大きい。
+そのため、Userや投稿などの機能を実際に追加し、責務が混在し始めた時点で
+機能単位の分割を検討する。
+
+router内のDB処理もまだ小さく、複数のエンドポイントから
+共通利用するビジネスロジックが十分に生じていない。
+service / CRUD層は形だけ先に導入せず、重複や再利用の必要が発生したときに追加する。
+
+#### 次につながること
+
+Phase 9 / Step 9-1で、ユーザー個人に紐づくデータを管理するために
+Userが必要な理由を整理する。
+
+### Phase 9 / Step 9-1からStep 9-2：Userの必要性とDBモデル
+
+#### 実施内容
+
+読みたいリスト、読書記録、学び・気づき、評価、投稿などを
+「誰のデータか」区別するためにUserが必要だと整理した。
+
+`users` テーブルに `id`、`username`、`email`、`hashed_password` を持つ
+Userモデルを追加した。`id` は主キー、`username`・`email` は
+必須かつ重複禁止、`hashed_password` は必須とした。
+
+Alembicでマイグレーション `28308531d9c5_create_users_table.py` を生成し、
+Userテーブル以外に意図しない変更がないことを確認後、PostgreSQLへ適用した。
+`alembic current` と `psql` の `\d users` で、適用位置とテーブル構造を確認した。
+
+#### 学んだこと
+
+`username`・`email` はユーザーを識別するためUNIQUE制約が必要だが、
+`hashed_password` はユーザーを一意に識別する値ではないため重複禁止にしない。
+
+モデルを追加しただけではDBテーブルは作られない。
+Alembicのautogenerateでモデルと現在のDBを比較して変更手順を生成し、
+`upgrade head` はモデル自体ではなく生成済みのマイグレーションを適用する。
+
+#### 開発順序の変更
+
+元のROADMAPはユーザー登録後にパスワードハッシュを学ぶ順序だったが、
+生パスワードを一時的にもDBへ保存する実装と、すぐ書き直す二度手間を避けるため、
+受講者と合意のうえでStep 9-3をパスワードハッシュ、
+Step 9-4をユーザー登録の順に変更した。
+
+#### 次につながること
+
+Phase 9 / Step 9-3で、生パスワードをDBへ保存しないための
+パスワードハッシュを学び、登録APIの前提を作る。
+
+### Phase 9 / Step 9-3からStep 9-4：パスワードハッシュとユーザー登録
+
+#### 実施内容
+
+FastAPI公式ドキュメントの推奨に合わせ、`pwdlib[argon2]` を導入した。
+`security.py` に `PasswordHash.recommended()` のインスタンスと、
+生パスワードをArgon2ハッシュへ変換する `hash_password()` を作成した。
+
+Bookに加えてUserのスキーマが必要になったため、単一の `schemas.py` を
+`schemas/books.py` と `schemas/users.py` の機能別パッケージに整理した。
+User登録の入力用に `UserCreate`、出力用に `UserResponse` を追加した。
+emailは `EmailStr` で検証するため `email-validator` も導入した。
+
+`routers/users.py` を作成し、`POST /users` でユーザー登録を実装した。
+request bodyの生パスワードをハッシュ化し、SQLAlchemyのUserには
+`hashed_password` だけを渡してDBへ保存する。
+`UserResponse` により、レスポンスは `id`・`username` だけに制限した。
+
+usernameまたはemailのUNIQUE制約違反は `IntegrityError` として捕捉し、
+`rollback()` 後に `409 Conflict` と利用者向けの説明を返すようにした。
+
+#### 動作確認
+
+Swagger UIで正常登録が201を返し、レスポンスにemail・password・hashed_passwordが
+含まれないことを確認した。PostgreSQLで、生パスワードではなく
+`$argon2id$` で始まるハッシュが保存されていることを確認した。
+
+同じusername・emailの再登録は409、メール形式違反、8文字未満のpassword、
+空白だけのusernameはPydanticの検証により422となることを確認した。
+
+#### 学んだこと
+
+利用者から受け取るのは `password` であり、`hashed_password` はバックエンドが
+生成・保存する。登録時の入力にもレスポンスにも `hashed_password` は含めない。
+ハッシュは復号してログインするのではなく、入力された生パスワードと
+保存済みハッシュが対応するかを照合する。
+
+#### 次につながること
+
+Phase 9 / Step 9-5で、ユーザーをDBから取得し、
+入力パスワードと保存済みハッシュを照合するログイン処理へ進む。
+
+### Phase 9 / Step 9-5からStep 9-6：ログインとJWT発行
+
+#### 実施内容
+
+ログイン入力用の `UserLogin` と、JWTを返す `LoginResponse` を追加した。
+`POST /users/login` はemailでUserを1件取得し、Userが存在しない場合と
+`verify_password()` が偽を返した場合の両方で、同じメッセージの
+`401 Unauthorized` を返すようにした。
+
+PyJWTを導入し、`.env` のJWT秘密鍵をPydantic Settingsから読み取る構成にした。
+JWTの有効時間は設定値として30分とし、署名アルゴリズムはHS256に固定した。
+`create_access_token()` はUser IDを文字列へ変換して `sub` に入れ、
+UTCの現在時刻から30分後を `exp` に入れて署名付きJWTを生成する。
+ログイン成功時は `access_token` と `token_type: bearer` を返す。
+
+#### 動作確認
+
+Swagger UIで、正しいemail・passwordによるログインが200を返し、
+レスポンスに `access_token` と `token_type: bearer` が含まれることを確認した。
+存在しないemailと間違ったpasswordは同じ401、不正なemail形式と
+空のpasswordはPydanticの入力検証により422になることを確認した。
+
+#### 学んだこと
+
+emailはDBから対象Userを探すために使い、生パスワードはDBの
+`hashed_password` と照合する。Userの存在確認前にハッシュへアクセスすると、
+`None` に属性がないため意図しない500エラーになる。
+
+JWTは暗号化された秘密箱ではなく、内容を読み取ることはできる。
+秘密鍵と署名により改ざんを検出し、`exp` によって利用可能な期間を制限する。
+JWTにはpasswordやハッシュを入れず、Userを一意に識別するIDを `sub` に入れる。
+
+#### 次につながること
+
+Phase 9 / Step 9-7で、クライアントが送ったBearerトークンを受け取り、
+JWTを検証して `sub` のUser IDからログインユーザーを取得する。
+
+### Phase 9 / Step 9-7：JWTからログインユーザーを取得
+
+#### 実施内容
+
+HTTP Bearer方式を採用し、`HTTPBearer` でAuthorizationヘッダーの
+`Bearer` とJWT文字列を分離する入口を作成した。現在のログインAPIは
+email・passwordをJSONで受け取る独自形式のため、フォーム形式を前提とする
+OAuth2 Password Flowの `OAuth2PasswordBearer` は使用しなかった。
+
+`security.py` に `decode_access_token()` を作成した。
+秘密鍵と許可するHS256を指定してJWTの署名と有効期限を検証し、
+ペイロードの `sub` を整数のUser IDへ変換して返す。
+
+`dependencies.py` に `get_current_user()` と `CurrentUserDep` を追加した。
+JWT検証に失敗した場合、`sub` を整数へ変換できない場合、User IDに対応する
+UserがDBに存在しない場合は、詳細な内部原因を外部へ区別せず401を返す。
+認証失敗の401には `WWW-Authenticate: Bearer` ヘッダーを付ける。
+
+`GET /users/me` を追加し、`CurrentUserDep` から受け取ったUserを
+`UserResponse` により `id`・`username` だけに制限して返すようにした。
+
+#### 動作確認
+
+Swagger UIのAuthorizeへJWT文字列だけを設定し、正常なJWTでは
+`GET /users/me` が200とテストUserの情報を返すことを確認した。
+JWTなしは `HTTPBearer` が401と `Not authenticated` を返し、
+不正なJWTは独自の認証処理が401と共通メッセージを返すことを確認した。
+期限切れJWTについても401になることを確認した。
+
+#### 学んだこと
+
+クライアントは `Authorization: Bearer <JWT>` として認証情報を送る。
+`HTTPBearer` はヘッダーを分解するが、JWTの署名や有効期限までは検証しない。
+JWT検証、`sub` の変換、DBからのUser取得はアプリ側で実装する必要がある。
+
+`Annotated` は基本の型にFastAPI向けの `Depends` 情報を付加できる。
+`CurrentUserDep` に認証処理をまとめることで、各APIは引数に追加するだけで
+同じログインUser取得処理を再利用できる。
+
+#### 次につながること
+
+Phase 9 / Step 9-8で、公開APIとログイン必須APIを分類し、
+ユーザー個人に紐づく操作へ `CurrentUserDep` を適用する。
+
+### Phase 9 / Step 9-8からStep 9-9：APIの公開範囲と管理者認可
+
+#### 実施内容
+
+本の一覧・詳細取得は未ログインでも使える公開APIとし、個人に紐づく操作は
+ログイン必須とする方針を整理した。共通のBook情報は正確性が必要なため、
+Book本体の登録・更新・削除は一般ユーザーに許可せず、管理者または
+システム内部用として保護する設計にした。
+
+Userモデルへ `is_admin` を追加し、Python側とPostgreSQL側の既定値を
+ともに `false` とした。Alembicマイグレーションを作成・適用し、
+既存ユーザーを含めて `is_admin` がNOT NULLかつfalseになることを確認した。
+
+`get_current_admin()` は `CurrentUserDep` から認証済みUserを受け取り、
+`is_admin` がfalseなら `403 Forbidden`、trueならUserを返す。
+これを再利用する `AdminUserDep` を作り、`POST /books`、
+`PATCH /books/{book_id}`、`DELETE /books/{book_id}`へ適用した。
+
+#### 動作確認
+
+Swagger UIで、有効なJWTを持つ一般ユーザーがBookの登録・更新・削除を
+実行すると403になり、処理されないことを確認した。
+テストユーザーを管理者へ変更して、登録は201、更新は200、削除は204となり、
+削除後の取得が404になることを確認した。
+
+#### 学んだこと
+
+認証は「誰であるか」を確認し、認可は「その人に操作を許可するか」を判断する。
+JWTを確認できない場合は401、本人を確認できても権限がない場合は403を使う。
+JWTにはUser IDを保持し、管理者権限はリクエストごとにDBの最新の
+`is_admin` を参照して判断する。
+
+#### 次につながること
+
+Phase 10 / Step 10-1で、ここまでの手動確認だけでは足りない理由を整理し、
+基本APIの自動テスト導入へ進む。

@@ -26,13 +26,14 @@ Codexは学習・開発を再開するとき、このファイルを確認し、
 
 ## 現在のPhase
 
-Phase 6：Book CRUDを完成させる
+Phase 10：基本テストを導入する
 
 ## 現在のStep
 
-Step 6-2：Book一覧取得。
+Step 10-1：なぜ手動確認だけでは足りないのか考える。
 
-アプリケーションの実装を開始しています。
+Phase 9で実装した登録・ログイン・JWT認証・管理者認可を振り返り、
+手動確認だけでは正常性を継続的に保証できない理由を整理する段階です。
 
 ---
 
@@ -126,6 +127,89 @@ Phase 6 / Step 6-1で、`BookCreate`による入力検証、リクエストご�
 Book用ルーター、`POST /books`を実装しました。Swagger UIでステータス201と
 自動生成されたIDを含むレスポンスを確認し、PostgreSQLへの保存も確認しました。
 
+Phase 6 / Step 6-2で、`select(Book)`で一覧取得の問い合わせを作り、
+`Session.scalars()`でPostgreSQLへ実行し、`.all()`で取得したBookを
+一覧として返す `GET /books` を実装しました。Swagger UIで、
+以前DBへ登録したBookがレスポンスに含まれることを確認しました。
+
+Phase 6 / Step 6-3で、`/{book_id}` のパスパラメータでIDを受け取り、
+`Session.get(Book, book_id)`で主キーに対応するBookを1件取得して返す
+`GET /books/{book_id}` を実装しました。Swagger UIで、指定したIDと
+レスポンスのBookが一致することを確認しました。
+
+Phase 6 / Step 6-4で、Bookの部分更新にPATCHを採用し、入力用の
+`BookUpdate` と `PATCH /books/{book_id}` を実装しました。
+`model_dump(exclude_unset=True)`で送信された項目だけを取り出し、
+`setattr()`で対象のBookへ反映して `commit()` で確定しました。
+Swagger UIで、指定項目だけが更新され、未送信項目は変わらず、
+続けてGETしても更新内容が残ることを確認しました。
+
+Phase 6 / Step 6-5で、`DELETE /books/{book_id}` を実装しました。
+`Session.get()`で対象を取得し、`Session.delete()`で削除対象として登録し、
+`commit()`でPostgreSQLからの削除を確定する流れを実装しました。
+削除確認用のBookを作成し、対象を確認後に削除し、
+ステータス204と本文なしのレスポンスを確認しました。
+
+Phase 6 / Step 6-6で、存在しないBookのGET・PATCH・DELETEに
+404を返す処理を追加しました。PATCHでは、`title`・`author`への
+`null`、更新項目なし、不正なISBNをPydanticの422で拒否することを
+確認しました。POSTとPATCHのISBN重複は、DBの `IntegrityError` を
+捕捉し、`rollback()`後に409 Conflictを返すようにしました。
+重複した登録・更新がDBに反映されないこともGETで確認済みです。
+
+Phase 7 / Step 7-1からStep 7-4で、POST入力用の `BookCreate`、
+PATCH入力用の `BookUpdate`、出力用の `BookResponse` の
+役割を整理しました。`BookResponse` は一般ユーザーに必要な
+`id`・`title`・`author`だけを定義し、GET・POST・PATCHの
+`response_model` に設定しました。Swagger UIでISBNがDBに残ったまま、
+レスポンスからのみ除外されることを確認しました。
+
+Phase 8 / Step 8-1からStep 8-5で、現在のコード構成と役割を
+確認しました。`main.py` とBookルーター、DB設定、Session依存性は
+すでに分離できています。現在はBookだけで規模が小さいため、
+models・schemasの追加分割とservice / CRUD層は導入せず、
+Userなどの機能を実際に追加する際に必要性から再検討します。
+
+Phase 9 / Step 9-1で、読みたいリストや読書記録などを
+個人ごとに管理するためにUserが必要だと整理しました。
+Step 9-2で `id`・`username`・`email`・`hashed_password` を持つ
+Userモデルを追加し、マイグレーション `28308531d9c5` を作成・確認・適用しました。
+PostgreSQLで `users` テーブルの主キー、必須制約、
+`username`・`email` のUNIQUE制約を確認済みです。
+
+Phase 9 / Step 9-3で、`pwdlib` とArgon2を導入し、
+生パスワードをハッシュ文字列へ変換する `hash_password()` を作成しました。
+Step 9-4でUser用スキーマと `POST /users` を実装し、
+レスポンスにパスワードやハッシュを含めず、DBにArgon2ハッシュだけが
+保存されることを確認しました。重複するusername・emailは409、
+不正なemail、短いpassword、空白だけのusernameは422で拒否することも確認済みです。
+
+Phase 9 / Step 9-5からStep 9-6で、`POST /users/login` を実装しました。
+emailでUserを取得し、入力パスワードと保存済みハッシュを照合します。
+認証成功時はUser IDを `sub`、30分後を `exp` とするJWTをHS256で署名し、
+`access_token` と `token_type: bearer` を返します。
+Swagger UIで正常ログインが200とJWTを返すこと、存在しないemailと
+間違ったpasswordは同じ401、不正なemail形式と空のpasswordは422に
+なることを確認済みです。
+
+Phase 9 / Step 9-7で、HTTP Bearer方式によりAuthorizationヘッダーから
+JWTを受け取り、署名・有効期限・`sub` を検証する処理を実装しました。
+`sub` のUser IDでDBからUserを取得する `get_current_user()` と、
+各APIから再利用する `CurrentUserDep` を作成しました。
+`GET /users/me` で正常なJWTは200と本人のUser情報、JWTなしと
+不正・期限切れのJWTは401になることをSwagger UIで確認済みです。
+
+Phase 9 / Step 9-8で、Bookの一覧・詳細取得は未ログインでも利用できる
+公開APIとし、ユーザー個人に紐づく操作はログイン必須とする方針を整理しました。
+Book本体の登録・更新・削除は、正確な共通書籍情報を守るため、
+一般ユーザーには許可せず管理者またはシステム内部用とする方針を決めました。
+
+Phase 9 / Step 9-9で、Userへ `is_admin` を追加し、既定値を `false` とする
+マイグレーションを適用しました。`get_current_admin()` と `AdminUserDep` を作成し、
+`POST /books`・`PATCH /books/{book_id}`・`DELETE /books/{book_id}` を
+管理者専用にしました。一般ユーザーは403、管理者はPOSTが201、PATCHが200、
+DELETEが204になることをSwagger UIで確認済みです。
+
 ローカルの `main` ブランチはGitHubの `origin/main` に接続済みで、
 プロジェクト管理文書の初回コミットを送信済みです。
 
@@ -133,15 +217,17 @@ Book用ルーター、`POST /books`を実装しました。Swagger UIでステ�
 
 # 現在行っていること
 
-固定したPythonリストを返している `GET /books` を、PostgreSQLの
-`books`テーブルから一覧を取得する処理へ変更します。
+Phase 9のUser登録、ログイン、JWT認証、公開範囲の整理、
+管理者認可まで完了しました。
+次は、これまで手動で確認してきたAPIへ自動テストを導入します。
 
 ---
 
 # 次に行うこと
 
-ROADMAPのPhase 6 / Step 6-2に従い、SQLAlchemyで複数のBookを
-取得し、FastAPIから一覧として返す流れを考えます。
+ROADMAPのPhase 10 / Step 10-1に従い、手動確認だけでは
+変更後の再確認漏れや回帰を防げない理由を整理します。
+理解確認後、Step 10-2でpytestを導入します。
 
 ---
 
@@ -149,13 +235,13 @@ ROADMAPのPhase 6 / Step 6-2に従い、SQLAlchemyで複数のBookを
 
 次回このプロジェクトを再開する場合は、
 
-**Phase 6 / Step 6-2：Book一覧取得**
+**Phase 10 / Step 10-1：なぜ手動確認だけでは足りないのか考える**
 
 から再開してください。
 
 現在の具体的な次の作業は、
 
-**固定した `books` リストをDBからの一覧取得へ置き換えること**
+**Phase 9で行った手動確認を振り返り、自動テストが必要な理由を考えること**
 
 です。
 
@@ -163,7 +249,7 @@ ROADMAPのPhase 6 / Step 6-2に従い、SQLAlchemyで複数のBookを
 
 # 未解決・確認待ち
 
-現時点では特になし。
+現時点で実装を妨げる未解決事項はありません。
 
 ---
 

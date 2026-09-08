@@ -1,8 +1,10 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
-from dependencies import SessionDep
+from dependencies import AdminUserDep, SessionDep
 from models import Book
-from schemas import BookCreate
+from schemas.books import BookCreate, BookResponse, BookUpdate
 
 router = APIRouter(
     prefix="/books",
@@ -10,47 +12,73 @@ router = APIRouter(
 )
 
 
-books = [
-    {
-        "id": 1,
-        "title": "GANTZ 1",
-        "author": "奥 浩哉",
-        "isbn": "978-4-08-876105-3",
-    },
-    {
-        "id": 2,
-        "title": "嫌われる勇気",
-        "author": "岸見 一郎、古賀 史健",
-        "isbn": "978-4-478-02581-9",
-    },
-    {
-        "id": 3,
-        "title": "メモの魔力",
-        "author": "前田 裕二",
-        "isbn": "978-4-344-03408-2",
-    },
-]
+@router.get("/{book_id}", response_model=BookResponse)
+def read_book(book_id: int, db: SessionDep):
+    book = db.get(Book, book_id)
+    if book is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="本が見つかりません。"
+        )
+    return book
 
 
-@router.get("/1")
-def read_book():
-    return books[0]
+@router.get("", response_model=list[BookResponse])
+def read_books(db: SessionDep):
+    statement = select(Book)
+    result = db.scalars(statement).all()
+    return result
 
 
-@router.get("")
-def read_books():
-    return books
-
-
-@router.post("", status_code=status.HTTP_201_CREATED)
-def create_book(book_data: BookCreate, db: SessionDep):
+@router.post("", status_code=status.HTTP_201_CREATED, response_model=BookResponse)
+def create_book(book_data: BookCreate, db: SessionDep, admin_user: AdminUserDep):
     book = Book(
         title=book_data.title,
         author=book_data.author,
         isbn=book_data.isbn,
     )
-
     db.add(book)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="同じISBNの本が既に登録されています。",
+        )
     db.refresh(book)
     return book
+
+
+@router.patch("/{book_id}", response_model=BookResponse)
+def update_book(
+    book_id: int, book_data: BookUpdate, db: SessionDep, admin_user: AdminUserDep
+):
+    target_book = db.get(Book, book_id)
+    if target_book is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="本がありません。"
+        )
+    update_data = book_data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(target_book, field, value)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="同じISBNの本が既に登録されています。",
+        )
+    db.refresh(target_book)
+    return target_book
+
+
+@router.delete("/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_book(book_id: int, db: SessionDep, admin_user: AdminUserDep):
+    target_book = db.get(Book, book_id)
+    if target_book is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="本がありません。"
+        )
+    db.delete(target_book)
+    db.commit()
