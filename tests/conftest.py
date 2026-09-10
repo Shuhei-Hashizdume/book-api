@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 
 from database import database_url, get_db
 from main import app
-from models import Book, User
+from models import Book, User, UserBook
 from security import create_access_token, hash_password
 
 TEST_DATABASE_URL = database_url.set(database="book_api_test")
@@ -109,4 +109,22 @@ def book_data():
 
     with TestingSessionLocal() as db:
         db.execute(delete(Book).where(Book.isbn == book["isbn"]))
+        db.commit()
+
+
+@pytest.fixture
+def user_book_data(book_in_db, registered_user):
+    user_book_data = {
+        "book_id": book_in_db.id,
+        "priority": "high",
+    }
+    yield user_book_data
+
+    with TestingSessionLocal() as db:
+        db.execute(
+            delete(UserBook).where(
+                UserBook.user_id == registered_user.id,
+                UserBook.book_id == book_in_db.id,
+            )
+        )
         db.commit()

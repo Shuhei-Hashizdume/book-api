@@ -1500,3 +1500,37 @@ APIレスポンスだけでなくDBを直接確認することで、保存・更
 #### 次につながること
 
 Phase 11 / Feature 1で、読みたいリスト・優先度管理の設計へ進む。
+
+### Phase 11 / Feature 1：読みたいリスト・優先度管理
+
+#### 実施内容
+
+UserとBookの関係を表す `UserBook` モデルと `user_books` テーブルを追加した。
+User・Bookへの外部キーと、同じUserが同じBookを重複登録しないための
+複合一意制約を設定した。優先度は `ReadingPriority` とPostgreSQLの
+`reading_priority` Enumを使い、`high`・`medium`・`low` で表現した。
+
+Alembicマイグレーションを開発用・テスト用DBに適用し、
+JWTから取得したログインUserに対する `POST`・`GET`・`PATCH`・
+`DELETE /users/me/books` を実装した。一覧取得では `relationship()` と
+`joinedload()` を使い、関連するBook情報も返すようにした。
+
+#### 動作確認
+
+正常登録、重複409、Bookなし404、JWTなし401、不正な優先度422、
+一覧取得、優先度更新、未登録Bookの更新404、削除の9件をテストした。
+既存テストと合わせた全22件が成功した。
+
+#### 学んだこと
+
+`ForeignKey`、`Enum`、`UniqueConstraint` がそれぞれ保証する内容を整理した。
+`relationship()` はPython上で関連オブジェクトをたどる仕組み、
+`joinedload()` は一覧取得時のN+1クエリを避ける取得方法として学んだ。
+
+また、テストが成功しても、URLやIDの参照対象を間違えると
+本来の意図と違う理由で成功する偽陽性が起こり得ることを確認した。
+
+#### 次につながること
+
+Phase 11 / Feature 2で、「読みたい・読書中・完読」などの
+読書ステータス管理の設計へ進む。
