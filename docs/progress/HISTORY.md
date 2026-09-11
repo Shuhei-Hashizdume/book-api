@@ -1534,3 +1534,43 @@ JWTから取得したログインUserに対する `POST`・`GET`・`PATCH`・
 
 Phase 11 / Feature 2で、「読みたい・読書中・完読」などの
 読書ステータス管理の設計へ進む。
+
+### Phase 11 / Feature 2：読書ステータス管理
+
+#### 実施内容
+
+`ReadingStatus` を追加し、`want_to_read`・`reading`・`completed` の
+3状態を定義した。`status` はBook共通の情報ではなく、
+各UserとBookの関係に属するため `UserBook` に保持する設計とした。
+新規登録時はクライアントに状態を指定させず、アプリ側で
+`want_to_read` を初期値にする方針とした。
+
+PostgreSQLに `reading_status` Enum型とNOT NULLの `status` 列を追加した。
+既存行のNULLを避けるため、列追加時だけ `WANT_TO_READ` の
+`server_default` を使い、追加後にDB側デフォルトを削除した。
+開発用・テスト用DBともに `a0d07068cbd1 (head)` まで適用した。
+
+`PATCH /users/me/books/{book_id}/status` を追加し、ログインUserの
+UserBookだけを更新するようにした。完読にはおすすめ度が必要なため、
+Feature 3の実装前は `completed` への変更を409で拒否する。
+
+#### 動作確認
+
+新規UserBookの初期状態がAPIレスポンスとDBの両方で
+`want_to_read` となることを確認した。読書中への更新200、
+おすすめ度なしの完読409、不正な状態422、未登録UserBook 404、
+JWTなし401を個別テストした。既存テストと合わせた全27件が成功した。
+
+#### 学んだこと
+
+優先度は「どれくらい読みたいか」、読書状態は
+「現在どこまで進んでいるか」を表す別の概念である。
+また、モデルの `default` はSQLAlchemy側、マイグレーションの
+`server_default` はPostgreSQL側で値を設定する違いを整理した。
+既存テーブルにNOT NULL列を追加する際は、既存行を
+どの値で移行するか決める必要がある。
+
+#### 次につながること
+
+Phase 11 / Feature 3で、1〜5のおすすめ度を保存し、
+おすすめ度と同時に完読へ変更できる設計へ進む。
