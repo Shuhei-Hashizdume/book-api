@@ -2,7 +2,7 @@ from sqlalchemy import Enum, ForeignKey, String, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
-from enums import ReadingPriority
+from enums import ReadingPriority, ReadingStatus
 
 
 class Book(Base):
@@ -34,6 +34,11 @@ class UserBook(Base):
     book: Mapped[Book] = relationship()
     priority: Mapped[ReadingPriority] = mapped_column(
         Enum(ReadingPriority, name="reading_priority"), nullable=False
+    )
+    status: Mapped[ReadingStatus] = mapped_column(
+        Enum(ReadingStatus, name="reading_status"),
+        nullable=False,
+        default=ReadingStatus.WANT_TO_READ,
     )
     __table_args__ = (
         UniqueConstraint(

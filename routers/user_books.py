@@ -4,11 +4,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 
 from dependencies import CurrentUserDep, SessionDep
+from enums import ReadingStatus
 from models import Book, UserBook
 from schemas.user_books import (
     UserBookCreate,
     UserBookListItem,
     UserBookResponse,
+    UserBookStatusUpdate,
     UserBookUpdate,
 )
 
@@ -89,3 +91,32 @@ def delete_user_book(book_id: int, current_user: CurrentUserDep, db: SessionDep)
         )
     db.delete(user_book)
     db.commit()
+
+
+@router.patch("/{book_id}/status", response_model=UserBookResponse)
+def update_user_book_status(
+    book_id: int,
+    db: SessionDep,
+    current_user: CurrentUserDep,
+    status_data: UserBookStatusUpdate,
+):
+    statement = select(UserBook).where(
+        UserBook.book_id == book_id, UserBook.user_id == current_user.id
+    )
+    user_book = db.scalar(statement)
+    if user_book is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="本が見つかりません"
+        )
+    if status_data.status == ReadingStatus.COMPLETED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="完読にするにはおすすめ度の登録が必要です。",
+        )
+
+    user_book.status = status_data.status
+
+    db.commit()
+    db.refresh(user_book)
+
+    return user_book
