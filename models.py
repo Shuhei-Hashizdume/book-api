@@ -1,4 +1,11 @@
-from sqlalchemy import Enum, ForeignKey, String, UniqueConstraint, false
+from sqlalchemy import (
+    CheckConstraint,
+    Enum,
+    ForeignKey,
+    String,
+    UniqueConstraint,
+    false,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -40,10 +47,19 @@ class UserBook(Base):
         nullable=False,
         default=ReadingStatus.WANT_TO_READ,
     )
+    recommendation_score: Mapped[int | None] = mapped_column(nullable=True)
     __table_args__ = (
         UniqueConstraint(
             "user_id",
             "book_id",
             name="uq_user_books_user_id_book_id",
+        ),
+        CheckConstraint(
+            "recommendation_score IS NULL OR recommendation_score BETWEEN 1 AND 5",
+            name="ck_user_books_recommendation_score_range",
+        ),
+        CheckConstraint(
+            "status != 'COMPLETED' OR recommendation_score IS NOT NULL",
+            name="ck_user_books_completed_requires_recommendation_score",
         ),
     )

@@ -1574,3 +1574,37 @@ JWTなし401を個別テストした。既存テストと合わせた全27件が
 
 Phase 11 / Feature 3で、1〜5のおすすめ度を保存し、
 おすすめ度と同時に完読へ変更できる設計へ進む。
+
+### Phase 11 / Feature 3：おすすめ度評価
+
+#### 実施内容
+
+おすすめ度はUserごとにBookへ対して異なるため、
+`UserBook.recommendation_score` としてNULLまたは1〜5の整数を保存する設計とした。
+`ck_user_books_recommendation_score_range` で値の範囲を、
+`ck_user_books_completed_requires_recommendation_score` で完読時の必須条件をDBにも保持した。
+マイグレーション `3d757aa40a02` を開発用・テスト用DBに適用した。
+
+状態変更APIで、おすすめ度と同時なら `completed` へ変更できるようにした。
+また、完読済みのUserBookに限り、
+`PATCH /users/me/books/{book_id}/recommendation-score` でおすすめ度を後から変更できるようにした。
+完読を取り消した場合は、おすすめ度もNULLへ戻す設計とした。
+
+#### 動作確認
+
+完読とおすすめ度5の同時登録、完読後の5から4への変更を確認した。
+完読前のおすすめ度変更は409、0と6は422、
+未登録UserBookは404、JWTなしは401になることを確認した。
+既存テストと合わせた全34件が成功した。
+
+#### 学んだこと
+
+計算対象となるおすすめ度はEnumではなく整数で保存し、
+Pydanticの `Field(ge=1, le=5)` とPostgreSQLの `CheckConstraint` で二重に範囲を保護する。
+「AならB」という条件は、SQLでは「Aではない OR B」と表現できる。
+また、pytestの `parametrize` で同じテストを0と6の複数データで実行した。
+
+#### 次につながること
+
+Phase 11 / Feature 4で、1冊に対して複数の学び・気づきを
+その都度追加できるデータ構造とAPIを設計する。
