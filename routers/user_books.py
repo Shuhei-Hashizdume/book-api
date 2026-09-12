@@ -9,6 +9,7 @@ from models import Book, UserBook
 from schemas.user_books import (
     UserBookCreate,
     UserBookListItem,
+    UserBookRecommendationScoreUpdate,
     UserBookResponse,
     UserBookStatusUpdate,
     UserBookUpdate,
@@ -108,13 +109,47 @@ def update_user_book_status(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="本が見つかりません"
         )
-    if status_data.status == ReadingStatus.COMPLETED:
+    if (
+        status_data.status == ReadingStatus.COMPLETED
+        and status_data.recommendation_score is None
+    ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="完読にするにはおすすめ度の登録が必要です。",
         )
 
     user_book.status = status_data.status
+    user_book.recommendation_score = status_data.recommendation_score
+
+    db.commit()
+    db.refresh(user_book)
+
+    return user_book
+
+
+@router.patch("/{book_id}/recommendation-score", response_model=UserBookResponse)
+def update_user_book_recommendation_score(
+    recommendation_data: UserBookRecommendationScoreUpdate,
+    book_id: int,
+    db: SessionDep,
+    current_user: CurrentUserDep,
+):
+    statement = select(UserBook).where(
+        UserBook.book_id == book_id, UserBook.user_id == current_user.id
+    )
+    user_book = db.scalar(statement)
+
+    if user_book is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="本が見つかりません。"
+        )
+    if user_book.status != ReadingStatus.COMPLETED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="読書状態が完読でなければ、おすすめ度の変更はできません。",
+        )
+
+    user_book.recommendation_score = recommendation_data.recommendation_score
 
     db.commit()
     db.refresh(user_book)
