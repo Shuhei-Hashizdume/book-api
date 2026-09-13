@@ -3,6 +3,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     String,
+    Text,
     UniqueConstraint,
     false,
 )
@@ -39,6 +40,9 @@ class UserBook(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     book_id: Mapped[int] = mapped_column(ForeignKey("books.id"), nullable=False)
     book: Mapped[Book] = relationship()
+    insights: Mapped[list["Insight"]] = relationship(
+        back_populates="user_book", cascade="all, delete-orphan", passive_deletes=True
+    )
     priority: Mapped[ReadingPriority] = mapped_column(
         Enum(ReadingPriority, name="reading_priority"), nullable=False
     )
@@ -63,3 +67,13 @@ class UserBook(Base):
             name="ck_user_books_completed_requires_recommendation_score",
         ),
     )
+
+
+class Insight(Base):
+    __tablename__ = "insights"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_book_id: Mapped[int] = mapped_column(
+        ForeignKey("user_books.id", ondelete="CASCADE"), nullable=False
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    user_book: Mapped[UserBook] = relationship(back_populates="insights")

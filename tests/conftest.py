@@ -128,3 +128,27 @@ def user_book_data(book_in_db, registered_user):
             )
         )
         db.commit()
+
+
+@pytest.fixture
+def other_user(db_session):
+    user = User(
+        username="otheruser",
+        email="other@example.com",
+        hashed_password=hash_password("otherpassword"),
+    )
+
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    yield user
+
+    db_session.execute(delete(UserBook).where(UserBook.user_id == user.id))
+    db_session.delete(user)
+    db_session.commit()
+
+
+@pytest.fixture
+def other_access_token(other_user):
+    return create_access_token(other_user.id)
