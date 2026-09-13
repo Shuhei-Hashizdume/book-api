@@ -1608,3 +1608,40 @@ Pydanticの `Field(ge=1, le=5)` とPostgreSQLの `CheckConstraint` で二重に�
 
 Phase 11 / Feature 4で、1冊に対して複数の学び・気づきを
 その都度追加できるデータ構造とAPIを設計する。
+
+### Phase 11 / Feature 4：学び・気づき記録
+
+#### 実施内容
+
+1つのUserBookに複数の記録を持たせるため、`Insight` モデルを追加した。
+Insightは主キー、UserBookへの外部キー、本文を持つ。
+UserBook削除時に紐づくInsightも削除するため、外部キーへ
+`ON DELETE CASCADE` を設定し、SQLAlchemyのrelationshipも整えた。
+
+マイグレーション `22f250f52ddb` を開発用・テスト用DBへ適用した。
+Insightの入力・出力スキーマと専用ルーターを作成し、本人の本に対する
+POST・GET・PATCH・DELETEを実装した。一覧はIDの昇順で返す設計とした。
+
+#### 動作確認
+
+Swagger UIで複数登録、一覧取得、空配列、本文更新、削除を確認した。
+空白本文は422、対象のUserBookまたはInsightがなければ404、
+JWTがなければ401となることも確認した。
+
+自動テストでは、レスポンスだけでなくDBへの保存・更新・削除、
+UserBookとの紐づき、他人のInsightを変更・削除できないことも確認した。
+既存テストと合わせた全52件が成功した。
+
+#### 学んだこと
+
+一覧レスポンスは `list[InsightResponse]` で表し、SQLAlchemyの
+`order_by(Insight.id)` で返却順を明示する。404と空配列を区別するため、
+最初に本人のUserBookを確認し、その後Insightを検索する構成とした。
+
+エラーのステータスだけでなく、拒否された更新・削除の後にDBを確認することで、
+他人のデータや元の本文が変化していないことまでテストできる。
+
+#### 次につながること
+
+Phase 11 / Feature 5で、未登録・未ログインのユーザーも利用できる
+タイトル・著者による本の検索方法と、外部書籍APIの利用を検討する。
