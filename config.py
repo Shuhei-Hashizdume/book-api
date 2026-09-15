@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     db_password: str
     jwt_secret_key: str
     access_token_expire_minutes: int
+    google_books_api_key: str
 
     model_config = SettingsConfigDict(
         env_file=".env",

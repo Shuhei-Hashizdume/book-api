@@ -1,3 +1,4 @@
+import httpx2
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -8,12 +9,14 @@ from enums import ReadingStatus
 from models import Book, UserBook
 from schemas.user_books import (
     UserBookCreate,
+    UserBookFromSearchCreate,
     UserBookListItem,
     UserBookRecommendationScoreUpdate,
     UserBookResponse,
     UserBookStatusUpdate,
     UserBookUpdate,
 )
+from services.google_books import get_google_book
 
 router = APIRouter(prefix="/users/me/books", tags=["user-books"])
 
@@ -154,4 +157,76 @@ def update_user_book_recommendation_score(
     db.commit()
     db.refresh(user_book)
 
+    return user_book
+
+
+@router.post(
+    "/from-search", status_code=status.HTTP_201_CREATED, response_model=UserBookResponse
+)
+def create_user_book_from_search(
+    user_book_data: UserBookFromSearchCreate,
+    db: SessionDep,
+    current_user: CurrentUserDep,
+):
+    try:
+        google_book = get_google_book(user_book_data.external_id)
+    except httpx2.TimeoutException:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="書籍検索サービスから時間内に応答がありませんでした。",
+        )
+    except httpx2.RequestError:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="書籍検索サービスへ接続できませんでした。",
+        )
+    except httpx2.HTTPStatusError as error:
+        if error.response.status_code == status.HTTP_404_NOT_FOUND:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="選択した本がGoogle Booksに存在しません。",
+            )
+
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="書籍検索サービスから正常な応答を取得できませんでした。",
+        )
+
+    if google_book is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="選択した本には登録に必要な書籍情報がありません。",
+        )
+
+    statement = select(Book).where(Book.isbn == google_book.isbn)
+    book = db.scalar(statement)
+
+    try:
+        if book is None:
+            book = Book(
+                title=google_book.title,
+                author=google_book.author,
+                isbn=google_book.isbn,
+            )
+
+            db.add(book)
+            db.flush()
+
+        user_book = UserBook(
+            user_id=current_user.id,
+            book_id=book.id,
+            priority=user_book_data.priority,
+        )
+
+        db.add(user_book)
+        db.commit()
+
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="この本は既に読みたいリストへ登録されています。",
+        )
+
+    db.refresh(user_book)
     return user_book

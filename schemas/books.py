@@ -36,3 +36,10 @@ class BookResponse(BaseModel):
     id: int
     title: str
     author: str
+
+
+class BookSearchResult(BaseModel):
+    external_id: str
+    title: str
+    author: str
+    isbn: str
