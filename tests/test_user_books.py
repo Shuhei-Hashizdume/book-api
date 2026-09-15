@@ -1,8 +1,12 @@
+import httpx2
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from main import app
 from models import Book, UserBook
+from routers import user_books
+from schemas.books import BookSearchResult
 
 client = TestClient(app)
 
@@ -427,3 +431,434 @@ def test_update_user_book_recommendation_score_unauthorized(book_in_db):
     )
 
     assert patch_response.status_code == 401
+
+
+def test_create_user_book_from_search_creates_book_and_user_book(
+    monkeypatch,
+    access_token,
+    db_session,
+    registered_user,
+):
+    def fake_get_google_book(external_id: str) -> BookSearchResult:
+        assert external_id == "abc123"
+
+        return BookSearchResult(
+            external_id="abc123",
+            title="検索結果の本",
+            author="著者A / 著者B",
+            isbn="9780000000011",
+        )
+
+    monkeypatch.setattr(
+        user_books,
+        "get_google_book",
+        fake_get_google_book,
+    )
+
+    response = client.post(
+        "/users/me/books/from-search",
+        json={
+            "external_id": "abc123",
+            "priority": "high",
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 201
+    response_data = response.json()
+    assert isinstance(response_data["id"], int)
+    assert isinstance(response_data["book_id"], int)
+    assert response_data["priority"] == "high"
+    assert response_data["status"] == "want_to_read"
+    assert response_data["recommendation_score"] is None
+    assert set(response_data) == {
+        "id",
+        "book_id",
+        "priority",
+        "status",
+        "recommendation_score",
+    }
+
+    saved_book = db_session.get(Book, response_data["book_id"])
+
+    assert saved_book is not None
+    assert saved_book.title == "検索結果の本"
+    assert saved_book.author == "著者A / 著者B"
+    assert saved_book.isbn == "9780000000011"
+
+    saved_user_book = db_session.get(UserBook, response_data["id"])
+
+    assert saved_user_book is not None
+    assert saved_user_book.user_id == registered_user.id
+    assert saved_user_book.book_id == saved_book.id
+    assert saved_user_book.priority.value == "high"
+    assert saved_user_book.status.value == "want_to_read"
+    assert saved_user_book.recommendation_score is None
+
+    db_session.delete(saved_user_book)
+    db_session.flush()
+    db_session.delete(saved_book)
+    db_session.commit()
+
+
+def test_create_user_book_from_search_reuses_existing_book(
+    monkeypatch,
+    access_token,
+    db_session,
+):
+    existing_book = Book(
+        title="DBに保存済みのタイトル",
+        author="DBに保存済みの著者",
+        isbn="9780000000012",
+    )
+    db_session.add(existing_book)
+    db_session.commit()
+    db_session.refresh(existing_book)
+
+    existing_book_id = existing_book.id
+    existing_title = existing_book.title
+    existing_author = existing_book.author
+
+    def fake_get_google_book(external_id: str) -> BookSearchResult:
+        assert external_id == "existing-book-id"
+
+        return BookSearchResult(
+            external_id="existing-book-id",
+            title="Google Books側のタイトル",
+            author="Google Books側の著者",
+            isbn="9780000000012",
+        )
+
+    monkeypatch.setattr(
+        user_books,
+        "get_google_book",
+        fake_get_google_book,
+    )
+
+    response = client.post(
+        "/users/me/books/from-search",
+        json={
+            "external_id": "existing-book-id",
+            "priority": "medium",
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 201
+    response_data = response.json()
+    assert response_data["book_id"] == existing_book_id
+    assert response_data["priority"] == "medium"
+
+    saved_user_book = db_session.get(UserBook, response_data["id"])
+
+    assert saved_user_book is not None
+    assert saved_user_book.book_id == existing_book_id
+
+    db_session.refresh(existing_book)
+    assert existing_book.title == existing_title
+    assert existing_book.author == existing_author
+    assert existing_book.isbn == "9780000000012"
+
+    db_session.delete(saved_user_book)
+    db_session.flush()
+    db_session.delete(existing_book)
+    db_session.commit()
+
+
+def test_create_user_book_from_search_returns_conflict_for_duplicate(
+    monkeypatch,
+    access_token,
+    db_session,
+    registered_user,
+):
+    def fake_get_google_book(external_id: str) -> BookSearchResult:
+        assert external_id == "duplicate-book-id"
+
+        return BookSearchResult(
+            external_id="duplicate-book-id",
+            title="重複確認用の本",
+            author="重複確認用の著者",
+            isbn="9780000000013",
+        )
+
+    monkeypatch.setattr(
+        user_books,
+        "get_google_book",
+        fake_get_google_book,
+    )
+
+    request_data = {
+        "external_id": "duplicate-book-id",
+        "priority": "high",
+    }
+    authorization_header = {"Authorization": f"Bearer {access_token}"}
+
+    first_response = client.post(
+        "/users/me/books/from-search",
+        json=request_data,
+        headers=authorization_header,
+    )
+
+    assert first_response.status_code == 201
+    first_response_data = first_response.json()
+
+    second_response = client.post(
+        "/users/me/books/from-search",
+        json=request_data,
+        headers=authorization_header,
+    )
+
+    assert second_response.status_code == 409
+    assert second_response.json() == {
+        "detail": "この本は既に読みたいリストへ登録されています。"
+    }
+
+    saved_books = db_session.scalars(
+        select(Book).where(Book.isbn == "9780000000013")
+    ).all()
+    saved_user_books = db_session.scalars(
+        select(UserBook).where(
+            UserBook.user_id == registered_user.id,
+            UserBook.book_id == first_response_data["book_id"],
+        )
+    ).all()
+
+    assert len(saved_books) == 1
+    assert len(saved_user_books) == 1
+    assert saved_user_books[0].book_id == first_response_data["book_id"]
+
+    db_session.delete(saved_user_books[0])
+    db_session.flush()
+    db_session.delete(saved_books[0])
+    db_session.commit()
+
+
+def test_create_user_book_from_search_unauthorized_without_token():
+    response = client.post(
+        "/users/me/books/from-search",
+        json={
+            "external_id": "abc123",
+            "priority": "high",
+        },
+    )
+
+    assert response.status_code == 401
+
+
+@pytest.mark.parametrize(
+    "request_data",
+    [
+        {
+            "external_id": "",
+            "priority": "high",
+        },
+        {
+            "external_id": "   ",
+            "priority": "high",
+        },
+        {
+            "external_id": "abc123",
+            "priority": "urgent",
+        },
+    ],
+)
+def test_create_user_book_from_search_rejects_invalid_request(
+    request_data,
+    access_token,
+):
+    response = client.post(
+        "/users/me/books/from-search",
+        json=request_data,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_create_user_book_from_search_rejects_incomplete_google_book(
+    monkeypatch,
+    access_token,
+):
+    def fake_get_google_book(external_id: str) -> None:
+        assert external_id == "abc123"
+        return None
+
+    monkeypatch.setattr(
+        user_books,
+        "get_google_book",
+        fake_get_google_book,
+    )
+
+    response = client.post(
+        "/users/me/books/from-search",
+        json={
+            "external_id": "abc123",
+            "priority": "high",
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "detail": "選択した本には登録に必要な書籍情報がありません。"
+    }
+
+
+def test_create_user_book_from_search_returns_not_found_for_missing_google_book(
+    monkeypatch,
+    access_token,
+):
+    def fake_get_google_book(external_id: str) -> None:
+        assert external_id == "missing-book-id"
+
+        request = httpx2.Request(
+            "GET",
+            f"https://www.googleapis.com/books/v1/volumes/{external_id}",
+        )
+        google_response = httpx2.Response(
+            status_code=404,
+            request=request,
+        )
+
+        raise httpx2.HTTPStatusError(
+            "Google Books API returned 404",
+            request=request,
+            response=google_response,
+        )
+
+    monkeypatch.setattr(
+        user_books,
+        "get_google_book",
+        fake_get_google_book,
+    )
+
+    response = client.post(
+        "/users/me/books/from-search",
+        json={
+            "external_id": "missing-book-id",
+            "priority": "high",
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": "選択した本がGoogle Booksに存在しません。"
+    }
+
+
+def test_create_user_book_from_search_returns_bad_gateway_for_google_error(
+    monkeypatch,
+    access_token,
+):
+    def fake_get_google_book(external_id: str) -> None:
+        assert external_id == "error-book-id"
+
+        request = httpx2.Request(
+            "GET",
+            f"https://www.googleapis.com/books/v1/volumes/{external_id}",
+        )
+        google_response = httpx2.Response(
+            status_code=500,
+            request=request,
+        )
+
+        raise httpx2.HTTPStatusError(
+            "Google Books API returned 500",
+            request=request,
+            response=google_response,
+        )
+
+    monkeypatch.setattr(
+        user_books,
+        "get_google_book",
+        fake_get_google_book,
+    )
+
+    response = client.post(
+        "/users/me/books/from-search",
+        json={
+            "external_id": "error-book-id",
+            "priority": "high",
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 502
+    assert response.json() == {
+        "detail": "書籍検索サービスから正常な応答を取得できませんでした。"
+    }
+
+
+def test_create_user_book_from_search_returns_bad_gateway_for_connection_error(
+    monkeypatch,
+    access_token,
+):
+    def fake_get_google_book(external_id: str) -> None:
+        assert external_id == "connection-error-book-id"
+
+        request = httpx2.Request(
+            "GET",
+            f"https://www.googleapis.com/books/v1/volumes/{external_id}",
+        )
+        raise httpx2.RequestError(
+            "Google Books API connection error",
+            request=request,
+        )
+
+    monkeypatch.setattr(
+        user_books,
+        "get_google_book",
+        fake_get_google_book,
+    )
+
+    response = client.post(
+        "/users/me/books/from-search",
+        json={
+            "external_id": "connection-error-book-id",
+            "priority": "high",
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 502
+    assert response.json() == {
+        "detail": "書籍検索サービスへ接続できませんでした。"
+    }
+
+
+def test_create_user_book_from_search_returns_gateway_timeout(
+    monkeypatch,
+    access_token,
+):
+    def fake_get_google_book(external_id: str) -> None:
+        assert external_id == "timeout-book-id"
+
+        request = httpx2.Request(
+            "GET",
+            f"https://www.googleapis.com/books/v1/volumes/{external_id}",
+        )
+        raise httpx2.TimeoutException(
+            "Google Books API timeout",
+            request=request,
+        )
+
+    monkeypatch.setattr(
+        user_books,
+        "get_google_book",
+        fake_get_google_book,
+    )
+
+    response = client.post(
+        "/users/me/books/from-search",
+        json={
+            "external_id": "timeout-book-id",
+            "priority": "high",
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 504
+    assert response.json() == {
+        "detail": "書籍検索サービスから時間内に応答がありませんでした。"
+    }

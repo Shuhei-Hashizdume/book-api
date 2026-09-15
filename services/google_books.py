@@ -1,0 +1,70 @@
+import httpx2
+
+from config import settings
+from schemas.books import BookSearchResult
+
+GOOGLE_BOOKS_API_URL = "https://www.googleapis.com/books/v1/volumes"
+
+
+def _parse_google_book(item: dict) -> BookSearchResult | None:
+    external_id = item.get("id")
+    volume_info = item.get("volumeInfo", {})
+
+    title = volume_info.get("title")
+    authors = volume_info.get("authors", [])
+
+    industry_identifiers = volume_info.get("industryIdentifiers", [])
+    isbn = None
+    for industry_data in industry_identifiers:
+        if industry_data.get("type") == "ISBN_13":
+            isbn = industry_data.get("identifier")
+            break
+    if not external_id or not title or not authors or not isbn:
+        return None
+    author = " / ".join(authors)
+
+    search_result = BookSearchResult(
+        external_id=external_id,
+        title=title,
+        author=author,
+        isbn=isbn,
+    )
+    return search_result
+
+
+def search_google_books(
+    query: str,
+) -> list[BookSearchResult]:
+
+    response = httpx2.get(
+        GOOGLE_BOOKS_API_URL,
+        params={"q": query},
+        headers={"x-goog-api-key": settings.google_books_api_key},
+        timeout=10.0,
+    )
+
+    response.raise_for_status()
+    response_data = response.json()
+    items = response_data.get("items", [])
+    search_results: list[BookSearchResult] = []
+    for item in items:
+        search_result = _parse_google_book(item)
+        if search_result is None:
+            continue
+
+        search_results.append(search_result)
+
+    return search_results
+
+
+def get_google_book(external_id: str) -> BookSearchResult | None:
+    response = httpx2.get(
+        f"{GOOGLE_BOOKS_API_URL}/{external_id}",
+        headers={"x-goog-api-key": settings.google_books_api_key},
+        timeout=10.0,
+    )
+
+    response.raise_for_status()
+    response_data = response.json()
+
+    return _parse_google_book(response_data)

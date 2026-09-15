@@ -1,15 +1,49 @@
+from typing import Annotated
+
+import httpx2
 from fastapi import APIRouter, HTTPException, status
+from pydantic import StringConstraints
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from dependencies import AdminUserDep, SessionDep
 from models import Book
-from schemas.books import BookCreate, BookResponse, BookUpdate
+from schemas.books import BookCreate, BookResponse, BookSearchResult, BookUpdate
+from services.google_books import search_google_books
 
 router = APIRouter(
     prefix="/books",
     tags=["books"],
 )
+
+
+@router.get("/search", response_model=list[BookSearchResult])
+def search_books(
+    q: Annotated[
+        str,
+        StringConstraints(
+            min_length=1,
+            strip_whitespace=True,
+        ),
+    ],
+):
+    try:
+        return search_google_books(q)
+    except httpx2.TimeoutException:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="書籍検索サービスから時間内に応答がありませんでした。",
+        )
+    except httpx2.RequestError:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="書籍検索サービスへ接続できませんでした。",
+        )
+    except httpx2.HTTPStatusError:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="書籍検索サービスから正常な応答を取得できませんでした。",
+        )
 
 
 @router.get("/{book_id}", response_model=BookResponse)
