@@ -1,9 +1,64 @@
 import httpx2
 
 from config import settings
+from enums import BookGenre
 from schemas.books import BookSearchResult
 
 GOOGLE_BOOKS_API_URL = "https://www.googleapis.com/books/v1/volumes"
+
+
+def _convert_google_category_to_genre(main_category: str | None) -> BookGenre:
+    if main_category is None:
+        return BookGenre.OTHER
+
+    normalized_category = main_category.lower()
+
+    if (
+        "comics" in normalized_category
+        or "manga" in normalized_category
+        or "graphic novels" in normalized_category
+    ):
+        return BookGenre.MANGA
+
+    if "fiction" in normalized_category:
+        return BookGenre.NOVEL
+
+    if (
+        "business" in normalized_category
+        or "economics" in normalized_category
+        or "finance" in normalized_category
+    ):
+        return BookGenre.BUSINESS
+
+    if "self-help" in normalized_category or "self help" in normalized_category:
+        return BookGenre.SELF_HELP
+
+    if (
+        "computers" in normalized_category
+        or "technology" in normalized_category
+        or "engineering" in normalized_category
+    ):
+        return BookGenre.TECHNOLOGY
+
+    if (
+        "history" in normalized_category
+        or "philosophy" in normalized_category
+        or "social science" in normalized_category
+        or "psychology" in normalized_category
+        or "religion" in normalized_category
+        or "biography" in normalized_category
+    ):
+        return BookGenre.HUMANITIES
+
+    if (
+        "science" in normalized_category
+        or "mathematics" in normalized_category
+        or "medical" in normalized_category
+        or "nature" in normalized_category
+    ):
+        return BookGenre.SCIENCE
+
+    return BookGenre.OTHER
 
 
 def _parse_google_book(item: dict) -> BookSearchResult | None:
@@ -12,6 +67,14 @@ def _parse_google_book(item: dict) -> BookSearchResult | None:
 
     title = volume_info.get("title")
     authors = volume_info.get("authors", [])
+
+    main_category = volume_info.get("mainCategory")
+    categories = volume_info.get("categories", [])
+    category = main_category
+    if not category and categories:
+        category = categories[0]
+
+    genre = _convert_google_category_to_genre(category)
 
     industry_identifiers = volume_info.get("industryIdentifiers", [])
     isbn = None
@@ -28,6 +91,7 @@ def _parse_google_book(item: dict) -> BookSearchResult | None:
         title=title,
         author=author,
         isbn=isbn,
+        genre=genre,
     )
     return search_result
 

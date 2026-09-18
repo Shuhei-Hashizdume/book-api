@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 
 from dependencies import CurrentUserDep, SessionDep
-from enums import ReadingStatus
+from enums import BookGenre, ReadingStatus
 from models import Book, UserBook
 from schemas.user_books import (
     UserBookCreate,
@@ -207,10 +207,12 @@ def create_user_book_from_search(
                 title=google_book.title,
                 author=google_book.author,
                 isbn=google_book.isbn,
+                genre=google_book.genre,
             )
-
             db.add(book)
             db.flush()
+        elif book.genre == BookGenre.OTHER and google_book.genre != BookGenre.OTHER:
+            book.genre = google_book.genre
 
         user_book = UserBook(
             user_id=current_user.id,

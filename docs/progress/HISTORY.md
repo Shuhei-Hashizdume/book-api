@@ -1747,3 +1747,105 @@ HTTP例外が持つRequestとResponseの違いを確認した。
 
 Phase 11 / Feature 6で、1冊のBookに複数ジャンルを設定するための
 データ構造と多対多の関係、ジャンル検索APIの要件を整理する。
+
+### Phase 11 / Feature 6：ジャンル機能の見送り
+
+#### 方針変更
+
+2026-09-16、ジャンル属性の保存とジャンル検索は、
+今回の実装対象から外すことを決定した。
+本の検索は、Feature 5で実装したGoogle Books APIの
+`q` を使うキーワード検索に一本化する。
+
+この決定により、Genreモデル、genresテーブル、
+BookとGenreの中間テーブル、Google Booksのcategoriesの保存、
+ジャンル検索APIは作成しない。
+ジャンル機能を利用するコードはまだ実装していないため、
+既存コードとDBの削除・変更は発生しない。
+
+#### 影響範囲
+
+書籍詳細の表示候補からジャンルを外した。
+関連書籍レコメンドで予定していた「同じジャンル」という条件も使わず、
+同機能に着手するときに利用可能なデータから改めて設計する。
+
+#### 次につながること
+
+Phase 11 / Feature 7の書籍詳細へ進み、公開情報と
+ログイン中のユーザーだけに必要な個人用情報を整理する。
+
+### Phase 11 / Feature 6：代表ジャンルの追加へ方針修正
+
+#### 方針変更
+
+ジャンル検索は引き続き実装しないが、
+書籍詳細で本の種類を理解しやすくするため、
+Bookに代表ジャンルを1つ保存する方針へ修正した。
+
+Google Booksの `volumeInfo.mainCategory` をそのままフロントエンドへ返さず、
+バックエンドでアプリ内部の値へ変換してBookに保存する。
+初期値は `manga`、`novel`、`business`、`self_help`、
+`technology`、`humanities`、`science`、`other` の8種類とし、
+未知のGoogle Booksカテゴリは `other` に変換する。
+
+#### 実装範囲
+
+Genreモデル、BookとGenreの中間テーブル、複数ジャンルの管理、
+ジャンル検索APIは作成しない。
+フロントエンドは、APIから受け取ったアプリ内部値を
+対応する日本語のジャンル名として表示する。
+
+#### 次につながること
+
+Bookの代表ジャンルに使う型、NULLの扱い、
+Google Booksのカテゴリからアプリ内部値への変換ルールを設計する。
+
+### Phase 11 / Feature 6：代表ジャンルの取得・変換・保存
+
+#### 実施内容
+
+`BookGenre` を追加し、`manga`、`novel`、`business`、`self_help`、
+`technology`、`humanities`、`science`、`other` の8種類を定義した。
+BookにNULL禁止の `genre` を追加し、値を指定しない新規Bookは
+SQLAlchemy側の既定値で `other` とする設計とした。
+
+マイグレーション `ae226236b2ef` でPostgreSQLの `book_genre` Enum型と
+`books.genre` を追加した。既存Bookには一時的な `server_default="OTHER"` で
+値を入れ、追加後にDB側の既定値を削除した。
+開発用・テスト用DBの両方へ適用済み。
+
+Google Booksの `mainCategory` を優先し、値がない場合は
+`categories[0]` を使うフォールバックを追加した。
+英語カテゴリのキーワードを8種類のアプリ内部値へ変換し、
+カテゴリがない場合と未対応カテゴリは `other` とする。
+
+検索レスポンスに `genre` を追加した。
+検索結果から新規Bookを作成する場合は変換後のジャンルを保存し、
+既存Bookは現在値が `other` でGoogle Books側が具体的なジャンルの場合だけ補完する。
+既存の具体的なジャンルは上書きしない。
+
+#### 動作確認
+
+カテゴリ変換の9ケース、`mainCategory` と `categories`の両経路、
+新規Bookへの保存、既存Bookの補完、既存ジャンルの保護を自動テストした。
+既存機能を含む全87件が成功した。
+
+Swagger UIから `GET /books/search?q=Clean Code` を実行し、
+Google Booksのカテゴリから `technology` へ変換された検索結果を確認した。
+カテゴリ自体がない本や、`Reference / General` など現在の
+変換ルールにないカテゴリは `other` になることも確認した。
+
+#### 学んだこと
+
+SQLAlchemy側の `default` とPostgreSQL側の `server_default` の担当範囲、
+既存行があるテーブルへNULL禁止カムを追加する方法、
+Enum型を作成・削除するマイグレーションの順序を確認した。
+
+また、フォールバックの役割、空リストの真偽値、
+文字列とリストの `[0]` の違い、大文字・小文字を揃えた
+部分一致によるカテゴリ変換を学んだ。
+
+#### 次につながること
+
+Phase 11 / Feature 7で、代表ジャンルを含む書籍詳細と、
+未ログインの閲覧者にも公開する値、ログイン中のユーザーにだけ返す値を設計する。
