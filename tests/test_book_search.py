@@ -2,6 +2,7 @@ import httpx2
 import pytest
 from fastapi.testclient import TestClient
 
+from enums import BookGenre
 from main import app
 from routers import books
 from schemas.books import BookSearchResult
@@ -28,6 +29,7 @@ def test_search_books_returns_results(monkeypatch):
                 title="GANTZ",
                 author="奥浩哉",
                 isbn="9784086196123",
+                genre=BookGenre.MANGA,
             )
         ]
 
@@ -49,6 +51,7 @@ def test_search_books_returns_results(monkeypatch):
             "title": "GANTZ",
             "author": "奥浩哉",
             "isbn": "9784086196123",
+            "genre": "manga",
         }
     ]
 
@@ -182,6 +185,7 @@ def test_search_google_books_formats_results(monkeypatch):
                         "volumeInfo": {
                             "title": "GANTZ",
                             "authors": ["著者A", "著者B"],
+                            "categories": ["Comics & Graphic Novels"],
                             "industryIdentifiers": [
                                 {
                                     "type": "ISBN_10",
@@ -212,6 +216,7 @@ def test_search_google_books_formats_results(monkeypatch):
             title="GANTZ",
             author="著者A / 著者B",
             isbn="9784086196123",
+            genre=BookGenre.MANGA,
         )
     ]
 
@@ -326,6 +331,7 @@ def test_search_google_books_excludes_incomplete_results(monkeypatch):
             title="正常な本",
             author="著者",
             isbn="9780000000005",
+            genre=BookGenre.OTHER,
         )
     ]
 
@@ -365,6 +371,7 @@ def test_get_google_books(monkeypatch):
                 "volumeInfo": {
                     "title": "テスト本",
                     "authors": ["著者A", "著者B"],
+                    "mainCategory": "Business & Economics",
                     "industryIdentifiers": [
                         {
                             "type": "ISBN_13",
@@ -387,6 +394,7 @@ def test_get_google_books(monkeypatch):
         title="テスト本",
         author="著者A / 著者B",
         isbn="9780000000001",
+        genre=BookGenre.BUSINESS,
     )
 
 
@@ -410,3 +418,26 @@ def test_get_google_book_raises_for_error_response(monkeypatch):
 
     with pytest.raises(httpx2.HTTPStatusError):
         google_books.get_google_book("error-book-id")
+
+
+@pytest.mark.parametrize(
+    ("main_category", "expected_genre"),
+    [
+        ("Comics & Graphic Novels / Manga", BookGenre.MANGA),
+        ("Fiction", BookGenre.NOVEL),
+        ("Business & Economics", BookGenre.BUSINESS),
+        ("Self-Help", BookGenre.SELF_HELP),
+        ("Computers", BookGenre.TECHNOLOGY),
+        ("Social Science", BookGenre.HUMANITIES),
+        ("Science", BookGenre.SCIENCE),
+        ("Unknown Category", BookGenre.OTHER),
+        (None, BookGenre.OTHER),
+    ],
+)
+def test_convert_google_category_to_genre(
+    main_category,
+    expected_genre,
+):
+    result = google_books._convert_google_category_to_genre(main_category)
+
+    assert result == expected_genre

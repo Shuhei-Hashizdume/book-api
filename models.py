@@ -10,7 +10,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
-from enums import ReadingPriority, ReadingStatus
+from enums import BookGenre, ReadingPriority, ReadingStatus
 
 
 class Book(Base):
@@ -18,6 +18,11 @@ class Book(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     author: Mapped[str] = mapped_column(String(255), nullable=False)
+    genre: Mapped[BookGenre] = mapped_column(
+        Enum(BookGenre, name="book_genre"),
+        nullable=False,
+        default=BookGenre.OTHER,
+    )
     isbn: Mapped[str | None] = mapped_column(
         String(13),
         unique=True,

@@ -3,6 +3,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from enums import BookGenre
 from main import app
 from models import Book, UserBook
 from routers import user_books
@@ -447,6 +448,7 @@ def test_create_user_book_from_search_creates_book_and_user_book(
             title="検索結果の本",
             author="著者A / 著者B",
             isbn="9780000000011",
+            genre=BookGenre.MANGA,
         )
 
     monkeypatch.setattr(
@@ -485,6 +487,7 @@ def test_create_user_book_from_search_creates_book_and_user_book(
     assert saved_book.title == "検索結果の本"
     assert saved_book.author == "著者A / 著者B"
     assert saved_book.isbn == "9780000000011"
+    assert saved_book.genre == BookGenre.MANGA
 
     saved_user_book = db_session.get(UserBook, response_data["id"])
 
@@ -515,6 +518,8 @@ def test_create_user_book_from_search_reuses_existing_book(
     db_session.commit()
     db_session.refresh(existing_book)
 
+    assert existing_book.genre == BookGenre.OTHER
+
     existing_book_id = existing_book.id
     existing_title = existing_book.title
     existing_author = existing_book.author
@@ -527,6 +532,7 @@ def test_create_user_book_from_search_reuses_existing_book(
             title="Google Books側のタイトル",
             author="Google Books側の著者",
             isbn="9780000000012",
+            genre=BookGenre.BUSINESS,
         )
 
     monkeypatch.setattr(
@@ -558,6 +564,66 @@ def test_create_user_book_from_search_reuses_existing_book(
     assert existing_book.title == existing_title
     assert existing_book.author == existing_author
     assert existing_book.isbn == "9780000000012"
+    assert existing_book.genre == BookGenre.BUSINESS
+
+    db_session.delete(saved_user_book)
+    db_session.flush()
+    db_session.delete(existing_book)
+    db_session.commit()
+
+
+def test_create_user_book_from_search_preserves_existing_genre(
+    monkeypatch,
+    access_token,
+    db_session,
+):
+    existing_book = Book(
+        title="ジャンル設定済みの本",
+        author="著者A",
+        isbn="9780000000014",
+        genre=BookGenre.HUMANITIES,
+    )
+    db_session.add(existing_book)
+    db_session.commit()
+    db_session.refresh(existing_book)
+
+    existing_book_id = existing_book.id
+
+    def fake_get_google_book(external_id: str) -> BookSearchResult:
+        assert external_id == "book-with-existing-genre"
+
+        return BookSearchResult(
+            external_id="book-with-existing-genre",
+            title="Google Books側のタイトル",
+            author="Google Books側の著者",
+            isbn="9780000000014",
+            genre=BookGenre.BUSINESS,
+        )
+
+    monkeypatch.setattr(
+        user_books,
+        "get_google_book",
+        fake_get_google_book,
+    )
+
+    response = client.post(
+        "/users/me/books/from-search",
+        json={
+            "external_id": "book-with-existing-genre",
+            "priority": "medium",
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 201
+    response_data = response.json()
+    assert response_data["book_id"] == existing_book_id
+
+    saved_user_book = db_session.get(UserBook, response_data["id"])
+    assert saved_user_book is not None
+
+    db_session.refresh(existing_book)
+    assert existing_book.genre == BookGenre.HUMANITIES
 
     db_session.delete(saved_user_book)
     db_session.flush()
@@ -579,6 +645,7 @@ def test_create_user_book_from_search_returns_conflict_for_duplicate(
             title="重複確認用の本",
             author="重複確認用の著者",
             isbn="9780000000013",
+            genre=BookGenre.MANGA,
         )
 
     monkeypatch.setattr(
@@ -625,6 +692,7 @@ def test_create_user_book_from_search_returns_conflict_for_duplicate(
 
     assert len(saved_books) == 1
     assert len(saved_user_books) == 1
+    assert saved_books[0].genre == BookGenre.MANGA
     assert saved_user_books[0].book_id == first_response_data["book_id"]
 
     db_session.delete(saved_user_books[0])
@@ -681,7 +749,6 @@ def test_create_user_book_from_search_rejects_incomplete_google_book(
 ):
     def fake_get_google_book(external_id: str) -> None:
         assert external_id == "abc123"
-        return None
 
     monkeypatch.setattr(
         user_books,
@@ -742,9 +809,7 @@ def test_create_user_book_from_search_returns_not_found_for_missing_google_book(
     )
 
     assert response.status_code == 404
-    assert response.json() == {
-        "detail": "選択した本がGoogle Booksに存在しません。"
-    }
+    assert response.json() == {"detail": "選択した本がGoogle Booksに存在しません。"}
 
 
 def test_create_user_book_from_search_returns_bad_gateway_for_google_error(
@@ -822,9 +887,7 @@ def test_create_user_book_from_search_returns_bad_gateway_for_connection_error(
     )
 
     assert response.status_code == 502
-    assert response.json() == {
-        "detail": "書籍検索サービスへ接続できませんでした。"
-    }
+    assert response.json() == {"detail": "書籍検索サービスへ接続できませんでした。"}
 
 
 def test_create_user_book_from_search_returns_gateway_timeout(
