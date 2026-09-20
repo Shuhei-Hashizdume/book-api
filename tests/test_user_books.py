@@ -115,6 +115,92 @@ def test_read_user_books(user_book_data, access_token, book_in_db):
     assert len(get_response_data) == 1
 
 
+def test_read_user_book_detail_returns_registered_state(
+    user_book_data,
+    access_token,
+    book_in_db,
+):
+    post_response = client.post(
+        "/users/me/books",
+        json=user_book_data,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert post_response.status_code == 201
+
+    response = client.get(
+        f"/users/me/books/{book_in_db.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "book": {
+            "id": book_in_db.id,
+            "title": "テスト用の本",
+            "author": "テスト著者",
+            "genre": "other",
+            "average_recommendation_score": None,
+        },
+        "is_registered": True,
+        "priority": "high",
+        "status": "want_to_read",
+        "recommendation_score": None,
+    }
+
+
+def test_read_user_book_detail_returns_unregistered_state(
+    access_token,
+    book_in_db,
+):
+    response = client.get(
+        f"/users/me/books/{book_in_db.id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "book": {
+            "id": book_in_db.id,
+            "title": "テスト用の本",
+            "author": "テスト著者",
+            "genre": "other",
+            "average_recommendation_score": None,
+        },
+        "is_registered": False,
+        "priority": None,
+        "status": None,
+        "recommendation_score": None,
+    }
+
+
+def test_read_user_book_detail_unauthorized_without_token(book_in_db):
+    response = client.get(f"/users/me/books/{book_in_db.id}")
+
+    assert response.status_code == 401
+
+
+@pytest.mark.parametrize("book_id", ["abc", "0", "-1"])
+def test_read_user_book_detail_rejects_invalid_book_id(
+    book_id,
+    access_token,
+):
+    response = client.get(
+        f"/users/me/books/{book_id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_read_user_book_detail_not_found(access_token):
+    response = client.get(
+        "/users/me/books/999999",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+
+
 def test_update_user_book_priority(access_token, db_session, user_book_data):
     post_response = client.post(
         "/users/me/books",

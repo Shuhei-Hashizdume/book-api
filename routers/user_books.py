@@ -1,5 +1,7 @@
+from typing import Annotated
+
 import httpx2
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Path, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
@@ -9,6 +11,7 @@ from enums import BookGenre, ReadingStatus
 from models import Book, UserBook
 from schemas.user_books import (
     UserBookCreate,
+    UserBookDetailResponse,
     UserBookFromSearchCreate,
     UserBookListItem,
     UserBookRecommendationScoreUpdate,
@@ -16,6 +19,7 @@ from schemas.user_books import (
     UserBookStatusUpdate,
     UserBookUpdate,
 )
+from services.book_detail import get_book_with_average_score
 from services.google_books import get_google_book
 
 router = APIRouter(prefix="/users/me/books", tags=["user-books"])
@@ -56,6 +60,41 @@ def read_user_books(db: SessionDep, current_user: CurrentUserDep):
     )
     user_books = db.scalars(statement).all()
     return user_books
+
+
+@router.get("/{book_id}", response_model=UserBookDetailResponse)
+def get_user_book_detail(
+    book_id: Annotated[int, Path(gt=0)], db: SessionDep, current_user: CurrentUserDep
+):
+    book_detail = get_book_with_average_score(book_id, db)
+
+    if book_detail is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="本が見つかりません。",
+        )
+
+    statement = select(UserBook).where(
+        UserBook.user_id == current_user.id, UserBook.book_id == book_id
+    )
+    user_book = db.scalar(statement)
+
+    if user_book is None:
+        return UserBookDetailResponse(
+            book=book_detail,
+            is_registered=False,
+            priority=None,
+            status=None,
+            recommendation_score=None,
+        )
+
+    return UserBookDetailResponse(
+        book=book_detail,
+        is_registered=True,
+        priority=user_book.priority,
+        status=user_book.status,
+        recommendation_score=user_book.recommendation_score,
+    )
 
 
 @router.patch("/{book_id}", response_model=UserBookResponse)

@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 from enums import ReadingPriority, ReadingStatus
-from schemas.books import BookResponse
+from schemas.books import BookDetailResponse, BookResponse
 
 
 class UserBookCreate(BaseModel):
@@ -43,3 +43,11 @@ class UserBookFromSearchCreate(BaseModel):
 
     external_id: str = Field(min_length=1)
     priority: ReadingPriority
+
+
+class UserBookDetailResponse(BaseModel):
+    book: BookDetailResponse
+    is_registered: bool
+    priority: ReadingPriority | None
+    status: ReadingStatus | None
+    recommendation_score: int | None
