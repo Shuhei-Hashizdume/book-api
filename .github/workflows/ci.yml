@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: book_api_test
+      DB_USER: book_api_user
+      DB_PASSWORD: test_password
+      JWT_SECRET_KEY: ci_only_test_secret_key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      GOOGLE_BOOKS_API_KEY: ci_only_test_api_key
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: book_api_test
+          POSTGRES_USER: book_api_user
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run database migrations
+        run: python -m alembic upgrade head
+
+      - name: Run tests
+        run: python -m pytest
