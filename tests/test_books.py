@@ -1,8 +1,10 @@
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from enums import ReadingPriority, ReadingStatus
 from main import app
-from models import Book
+from models import Book, UserBook
 
 client = TestClient(app)
 
@@ -27,7 +29,7 @@ def test_read_books_returns_books(book_in_db):
     ]
 
 
-def test_read_books_return_book(book_in_db):
+def test_read_book_returns_detail_without_recommendation_score(book_in_db):
     response = client.get(f"/books/{book_in_db.id}")
 
     assert response.status_code == 200
@@ -35,7 +37,62 @@ def test_read_books_return_book(book_in_db):
         "id": book_in_db.id,
         "title": "テスト用の本",
         "author": "テスト著者",
+        "genre": "other",
+        "average_recommendation_score": None,
     }
+
+
+def test_read_book_returns_average_recommendation_score(
+    user_book_data,
+    registered_user,
+    other_user,
+    third_user,
+    db_session,
+):
+    first_user_book = UserBook(
+        user_id=registered_user.id,
+        book_id=user_book_data["book_id"],
+        priority=ReadingPriority.HIGH,
+        status=ReadingStatus.COMPLETED,
+        recommendation_score=5,
+    )
+    second_user_book = UserBook(
+        user_id=other_user.id,
+        book_id=user_book_data["book_id"],
+        priority=ReadingPriority.HIGH,
+        status=ReadingStatus.COMPLETED,
+        recommendation_score=4,
+    )
+    third_user_book = UserBook(
+        user_id=third_user.id,
+        book_id=user_book_data["book_id"],
+        priority=ReadingPriority.HIGH,
+        status=ReadingStatus.COMPLETED,
+        recommendation_score=4,
+    )
+
+    db_session.add(first_user_book)
+    db_session.add(second_user_book)
+    db_session.add(third_user_book)
+    db_session.commit()
+
+    response = client.get(f'/books/{user_book_data["book_id"]}')
+
+    assert response.status_code == 200
+    assert response.json()["average_recommendation_score"] == 4.3
+
+
+def test_read_book_not_found():
+    response = client.get("/books/999999")
+
+    assert response.status_code == 404
+
+
+@pytest.mark.parametrize("book_id", ["abc", "0", "-1"])
+def test_read_book_rejects_invalid_book_id(book_id):
+    response = client.get(f"/books/{book_id}")
+
+    assert response.status_code == 422
 
 
 def test_create_book(book_data, admin_access_token, db_session):

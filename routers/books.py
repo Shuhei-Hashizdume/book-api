@@ -1,14 +1,21 @@
 from typing import Annotated
 
 import httpx2
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Path, status
 from pydantic import StringConstraints
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from dependencies import AdminUserDep, SessionDep
 from models import Book
-from schemas.books import BookCreate, BookResponse, BookSearchResult, BookUpdate
+from schemas.books import (
+    BookCreate,
+    BookDetailResponse,
+    BookResponse,
+    BookSearchResult,
+    BookUpdate,
+)
+from services.book_detail import get_book_with_average_score
 from services.google_books import search_google_books
 
 router = APIRouter(
@@ -46,14 +53,14 @@ def search_books(
         )
 
 
-@router.get("/{book_id}", response_model=BookResponse)
-def read_book(book_id: int, db: SessionDep):
-    book = db.get(Book, book_id)
-    if book is None:
+@router.get("/{book_id}", response_model=BookDetailResponse)
+def read_book(book_id: Annotated[int, Path(gt=0)], db: SessionDep):
+    book_detail = get_book_with_average_score(book_id, db)
+    if book_detail is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="本が見つかりません。"
         )
-    return book
+    return book_detail
 
 
 @router.get("", response_model=list[BookResponse])

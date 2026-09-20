@@ -46,3 +46,8 @@ class BookSearchResult(BaseModel):
     author: str
     isbn: str
     genre: BookGenre
+
+
+class BookDetailResponse(BookResponse):
+    genre: BookGenre
+    average_recommendation_score: float | None

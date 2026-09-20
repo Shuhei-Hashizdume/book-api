@@ -152,3 +152,22 @@ def other_user(db_session):
 @pytest.fixture
 def other_access_token(other_user):
     return create_access_token(other_user.id)
+
+
+@pytest.fixture
+def third_user(db_session):
+    user = User(
+        username="thirduser",
+        email="third@example.com",
+        hashed_password=hash_password("thirdpassword"),
+    )
+
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    yield user
+
+    db_session.execute(delete(UserBook).where(UserBook.user_id == user.id))
+    db_session.delete(user)
+    db_session.commit()

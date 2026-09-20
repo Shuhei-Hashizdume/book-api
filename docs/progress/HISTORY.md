@@ -1849,3 +1849,86 @@ Enum型を作成・削除するマイグレーションの順序を確認した�
 
 Phase 11 / Feature 7で、代表ジャンルを含む書籍詳細と、
 未ログインの閲覧者にも公開する値、ログイン中のユーザーにだけ返す値を設計する。
+
+### 開発基盤：GitHub ActionsによるCIの導入
+
+#### 実施内容
+
+2026-09-20、`.github/workflows/ci.yml` を追加し、
+main向けのPull Requestとmainへのpush時にCIを実行するようにした。
+
+GitHubが用意するUbuntu環境でPython 3.14をセットアップし、
+`requirements.txt` と `requirements-dev.txt` から依存関係をインストールする。
+PostgreSQL 17をサービスコンテナとして起動し、`pg_isready` による
+ヘルスチェック後、Alembicの最新マイグレーションとpytestを順番に実行する。
+
+CI環境では実際の秘密情報を使わず、DB接続、JWT、Google Books APIに
+テスト専用値を設定した。pipのダウンロードキャッシュも有効にした。
+
+#### 動作確認
+
+ローカルでテストDBへのAlembicマイグレーションと全87件のテスト成功を確認した。
+PR #7でGitHub Actions上のCI成功を確認し、mainへマージした。
+
+#### 学んだこと
+
+Workflow、Job、Stepの階層、`uses` と `run` の違い、
+Job側とPostgreSQLサービス側の環境変数の役割を確認した。
+また、ポートマッピング、ヘルスチェック、pipキャッシュの必要性と、
+CIは人間のように設計をレビューするのではなく、定義した検査を自動実行する仕組みだと理解した。
+
+#### 次につながること
+
+Phase 11 / Feature 7の書籍詳細の要件整理から開発を再開する。
+
+### Phase 11 / Feature 7：書籍詳細
+
+#### 設計判断
+
+未登録・未ログインでも閲覧できる公開書籍詳細と、
+ログインユーザー本人のUserBook状態を含む書籍詳細を分けた。
+公開APIは `GET /books/{book_id}`、認証済みAPIは
+`GET /users/me/books/{book_id}` とした。
+ログイン済みの画面は認証済みAPIだけを呼び、公開APIとの
+2回のHTTPリクエストを必要としない設計にした。
+
+公開情報はBookのID、タイトル、著者、代表ジャンル、平均おすすめ度とした。
+ISBNは照合・重複防止には必要だが、利用者向け詳細には表示しない。
+他ユーザーのおすすめ理由は読了投稿がまだ存在しないため、Feature 8以降へ延期した。
+
+#### 実施内容
+
+`BookDetailResponse` と `UserBookDetailResponse` を追加した。
+共通処理は `services/book_detail.py` の
+`get_book_with_average_score()` に分離し、Bookと
+`UserBook.recommendation_score` の平均を1回のDB問い合わせで取得する。
+平均計算はPostgreSQLの `AVG`、小数第1位への丸めはPythonが担当する。
+おすすめ度がない場合は `null` を返す。
+
+認証済みAPIは共通サービスの結果に加え、ログインユーザーとBookの
+組み合わせに一致するUserBookを取得する。未登録の場合も404にはせず、
+`is_registered=false` と個人項目の `null` をステータス200で返す。
+Book自体が存在しない場合は404、不正なBook IDは422、JWTなしは401とした。
+既存のModelと外部キーで実現できるため、ModelとMigrationは追加していない。
+
+#### 動作確認
+
+公開APIの平均なし・平均あり・404・422・認証不要をテストした。
+平均は3人のおすすめ度 `5`、`4`、`4` から得られる値を
+小数第1位の `4.3` へ丸めることも確認した。
+認証済みAPIでは登録済み、未登録、JWTなし、404、422を確認した。
+既存機能を含む全99件が成功した。
+
+#### 学んだこと
+
+HTTPリクエスト数と、1回のAPI処理内で行うDB問い合わせ数は別である。
+認証はアクセス中のUserを特定する処理であり、Bookの共通情報や
+本人のUserBook状態を取得する処理とは役割が異なる。
+また、外部結合によってUserBookがないBookも取得できること、
+通常列と集約関数を同時に取得するときの `GROUP BY`、
+SQLAlchemyの行データのアンパックを確認した。
+
+#### 次につながること
+
+Phase 11 / Feature 8で、読了投稿に必要なデータ、UserBookとの関係、
+公開状態、おすすめ度を重複保存するかを設計する。
