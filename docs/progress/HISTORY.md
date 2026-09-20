@@ -1849,3 +1849,34 @@ Enum型を作成・削除するマイグレーションの順序を確認した�
 
 Phase 11 / Feature 7で、代表ジャンルを含む書籍詳細と、
 未ログインの閲覧者にも公開する値、ログイン中のユーザーにだけ返す値を設計する。
+
+### 開発基盤：GitHub ActionsによるCIの導入
+
+#### 実施内容
+
+2026-09-20、`.github/workflows/ci.yml` を追加し、
+main向けのPull Requestとmainへのpush時にCIを実行するようにした。
+
+GitHubが用意するUbuntu環境でPython 3.14をセットアップし、
+`requirements.txt` と `requirements-dev.txt` から依存関係をインストールする。
+PostgreSQL 17をサービスコンテナとして起動し、`pg_isready` による
+ヘルスチェック後、Alembicの最新マイグレーションとpytestを順番に実行する。
+
+CI環境では実際の秘密情報を使わず、DB接続、JWT、Google Books APIに
+テスト専用値を設定した。pipのダウンロードキャッシュも有効にした。
+
+#### 動作確認
+
+ローカルでテストDBへのAlembicマイグレーションと全87件のテスト成功を確認した。
+PR #7でGitHub Actions上のCI成功を確認し、mainへマージした。
+
+#### 学んだこと
+
+Workflow、Job、Stepの階層、`uses` と `run` の違い、
+Job側とPostgreSQLサービス側の環境変数の役割を確認した。
+また、ポートマッピング、ヘルスチェック、pipキャッシュの必要性と、
+CIは人間のように設計をレビューするのではなく、定義した検査を自動実行する仕組みだと理解した。
+
+#### 次につながること
+
+Phase 11 / Feature 7の書籍詳細の要件整理から開発を再開する。
