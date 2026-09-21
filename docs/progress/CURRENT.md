@@ -30,21 +30,18 @@ Phase 11：読書サービス機能を1つずつ追加する
 
 ## 現在のStep
 
-Feature 7：書籍詳細が完了。
+Feature 8：読了投稿が完了。
 
-未ログインでも利用できる `GET /books/{book_id}` と、
-ログインユーザー本人のUserBook状態も返す
-`GET /users/me/books/{book_id}` を実装しました。
-Book、代表ジャンル、平均おすすめ度、本人の登録状態を返します。
-平均おすすめ度はNULLを除外し、小数第1位へ丸めます。
-自動テストまで完了し、全99件が成功しています。
+UserBookと1対0..1のReadingPostを追加し、
+本人の完読済みUserBookに対するPOST・GET・PATCH・DELETEを実装しました。
+おすすめ理由は1〜1000文字、空白のみを禁止し、初期公開状態は公開です。
+おすすめ度はUserBookの値を使い、ReadingPostには重複保存しません。
+ReadingPostがある間はUserBookの削除と完読以外への状態変更を409で拒否します。
 
-GitHub ActionsによるCIも導入済みです。
-main向けPRとmainへのpushを起点に、Python 3.14、PostgreSQL 17、
-Alembic、pytestを使った検証を自動実行します。
-PR #7でCIの成功を確認し、mainへのマージまで完了しました。
+Migrationを開発用・テスト用DBへ適用済みで、
+既存機能を含む全133件の自動テストが成功しています。
 
-次はFeature 8の読了投稿の要件を整理します。
+次はFeature 9の投稿公開設定へ進みます。
 
 ---
 
@@ -285,16 +282,16 @@ Pythonで小数第1位へ丸めて返します。
 
 # 現在行っていること
 
-Phase 11 / Feature 7の設計、Schema、Service、Router、
+Phase 11 / Feature 8のModel、Migration、Schema、Router、
 自動テストが完了しました。
-現在は、Feature 8の読了投稿へ進むところです。
+現在は、Feature 9の投稿公開設定へ進むところです。
 
 ---
 
 # 次に行うこと
 
-Feature 8を実装する前に、読了投稿に必要なデータ、
-既存のUserBookとの関係、公開状態、おすすめ度を重複保存するかを整理します。
+Feature 9で、本人が既存の読了投稿を
+公開・非公開に切り替えるAPIの要件と入力Schemaを設計します。
 
 ---
 
@@ -302,13 +299,13 @@ Feature 8を実装する前に、読了投稿に必要なデータ、
 
 次回このプロジェクトを再開する場合は、
 
-**Phase 11 / Feature 8：読了投稿の要件を整理する**
+**Phase 11 / Feature 9：投稿公開設定の要件を整理する**
 
 から再開してください。
 
 現在の具体的な次の作業は、
 
-**読了投稿に必要なデータと、既存のUserBookから再利用できるデータを分けること**
+**公開状態のみを変更する専用SchemaとAPIパスを考えること**
 
 です。
 
