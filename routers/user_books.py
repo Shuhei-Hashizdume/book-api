@@ -132,11 +132,6 @@ def delete_user_book(book_id: int, current_user: CurrentUserDep, db: SessionDep)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="本が見つかりません。"
         )
-    if user_book.reading_post is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="読了投稿を削除してから本を削除してください。",
-        )
     db.delete(user_book)
     db.commit()
 
@@ -156,15 +151,6 @@ def update_user_book_status(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="本が見つかりません"
         )
-    if (
-        status_data.status != ReadingStatus.COMPLETED
-        and user_book.reading_post is not None
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="読了投稿を削除してから完読状態を変更してください。",
-        )
-
     if (
         status_data.status == ReadingStatus.COMPLETED
         and status_data.recommendation_score is None

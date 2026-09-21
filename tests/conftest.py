@@ -1,5 +1,5 @@
 import pytest
-from sqlalchemy import create_engine, delete, select
+from sqlalchemy import create_engine, delete
 from sqlalchemy.orm import sessionmaker
 
 from database import database_url, get_db
@@ -121,17 +121,13 @@ def user_book_data(book_in_db, registered_user):
     yield user_book_data
 
     with TestingSessionLocal() as db:
-        statement = select(UserBook).where(
-            UserBook.user_id == registered_user.id,
-            UserBook.book_id == book_in_db.id,
+        db.execute(
+            delete(UserBook).where(
+                UserBook.user_id == registered_user.id,
+                UserBook.book_id == book_in_db.id,
+            )
         )
-        user_book = db.scalar(statement)
-
-        if user_book is not None:
-            if user_book.reading_post is not None:
-                db.delete(user_book.reading_post)
-            db.delete(user_book)
-            db.commit()
+        db.commit()
 
 
 @pytest.fixture
