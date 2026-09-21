@@ -1011,3 +1011,89 @@ def test_create_user_book_from_search_returns_gateway_timeout(
     assert response.json() == {
         "detail": "書籍検索サービスから時間内に応答がありませんでした。"
     }
+
+
+def test_update_completed_status_with_reading_post_returns_conflict(
+    user_book_data, access_token, db_session
+):
+    post_response = client.post(
+        "/users/me/books",
+        json=user_book_data,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert post_response.status_code == 201
+    post_response_data = post_response.json()
+    target_book_id = post_response_data["book_id"]
+
+    completed_response = client.patch(
+        f"/users/me/books/{target_book_id}/status",
+        json={"status": "completed", "recommendation_score": 5},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert completed_response.status_code == 200
+
+    reading_post_response = client.post(
+        f"/users/me/books/{target_book_id}/reading-post",
+        json={"recommendation_reason": "学びが多い"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert reading_post_response.status_code == 201
+
+    status_response = client.patch(
+        f"/users/me/books/{target_book_id}/status",
+        json={"status": "reading"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert status_response.status_code == 409
+
+    user_book = db_session.get(UserBook, post_response_data["id"])
+    assert user_book is not None
+    assert user_book.status.value == "completed"
+    assert user_book.recommendation_score == 5
+    assert user_book.reading_post is not None
+
+
+def test_delete_user_book_with_reading_post_returns_conflict(
+    user_book_data, access_token, db_session
+):
+    post_response = client.post(
+        "/users/me/books",
+        json=user_book_data,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert post_response.status_code == 201
+    post_response_data = post_response.json()
+    target_book_id = post_response_data["book_id"]
+
+    completed_response = client.patch(
+        f"/users/me/books/{target_book_id}/status",
+        json={"status": "completed", "recommendation_score": 5},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert completed_response.status_code == 200
+
+    reading_post_response = client.post(
+        f"/users/me/books/{target_book_id}/reading-post",
+        json={"recommendation_reason": "学びが多い"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert reading_post_response.status_code == 201
+
+    delete_response = client.delete(
+        f"/users/me/books/{target_book_id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert delete_response.status_code == 409
+
+    user_book = db_session.get(UserBook, post_response_data["id"])
+    assert user_book is not None
+    assert user_book.reading_post is not None
+    assert user_book.reading_post.id == reading_post_response.json()["id"]

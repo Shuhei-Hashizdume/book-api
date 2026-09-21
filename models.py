@@ -1,11 +1,16 @@
+from datetime import datetime
+
 from sqlalchemy import (
     CheckConstraint,
+    DateTime,
     Enum,
     ForeignKey,
     String,
     Text,
     UniqueConstraint,
     false,
+    func,
+    true,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -57,6 +62,9 @@ class UserBook(Base):
         default=ReadingStatus.WANT_TO_READ,
     )
     recommendation_score: Mapped[int | None] = mapped_column(nullable=True)
+    reading_post: Mapped["ReadingPost | None"] = relationship(
+        back_populates="user_book"
+    )
     __table_args__ = (
         UniqueConstraint(
             "user_id",
@@ -82,3 +90,35 @@ class Insight(Base):
     )
     content: Mapped[str] = mapped_column(Text, nullable=False)
     user_book: Mapped[UserBook] = relationship(back_populates="insights")
+
+
+class ReadingPost(Base):
+    __tablename__ = "reading_posts"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    user_book_id: Mapped[int] = mapped_column(
+        ForeignKey("user_books.id"), nullable=False
+    )
+    recommendation_reason: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    is_public: Mapped[bool] = mapped_column(
+        default=True, server_default=true(), nullable=False
+    )
+    user_book: Mapped[UserBook] = relationship(back_populates="reading_post")
+    __table_args__ = (
+        UniqueConstraint("user_book_id", name="uq_reading_posts_user_book_id"),
+        CheckConstraint(
+            "char_length(recommendation_reason) BETWEEN 1 AND 1000",
+            name="ck_reading_posts_recommendation_reason_length",
+        ),
+        CheckConstraint(
+            "recommendation_reason ~ '[^[:space:]]'",
+            name="ck_reading_posts_recommendation_reason_not_blank",
+        ),
+    )
