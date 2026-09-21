@@ -1932,3 +1932,62 @@ SQLAlchemyの行データのアンパックを確認した。
 
 Phase 11 / Feature 8で、読了投稿に必要なデータ、UserBookとの関係、
 公開状態、おすすめ度を重複保存するかを設計する。
+
+### Phase 11 / Feature 8：読了投稿
+
+#### 設計判断
+
+読了投稿は将来のいいね・タイムラインといった拡張を考慮し、
+UserBookとは別の `reading_posts` テーブルとした。
+1件のUserBookに対してReadingPostは0または1件とし、
+`user_book_id` のUNIQUE制約でDBにも重複禁止を保証させた。
+
+ReadingPostにはID、UserBookへの外部キー、おすすめ理由、
+公開状態、作成日時を保存する。
+おすすめ度はUserBookを正とし、ReadingPostへ重複保存しない。
+公開状態の初期値は `true` とし、作成時の明示的な `false` も受け付ける。
+
+投稿作成は本人のUserBookが `completed` で、
+おすすめ度が登録済みの場合に限定した。
+ReadingPostが存在する間は、UserBookの削除と
+`completed` 以外への状態変更を409で拒否する。
+
+#### 実施内容
+
+`ReadingPost` ModelとAlembic migration `f7094080c4f4` を追加し、
+開発用・テスト用PostgreSQLへ適用した。
+おすすめ理由は1〜1000文字、空白のみを禁止し、
+PydanticとPostgreSQLの両方で制約した。
+
+本人用の次のAPIを追加した。
+
+- `POST /users/me/books/{book_id}/reading-post`
+- `GET /users/me/books/{book_id}/reading-post`
+- `PATCH /users/me/books/{book_id}/reading-post`
+- `DELETE /users/me/books/{book_id}/reading-post`
+
+POSTでは通常の事前重複チェックに加え、
+同一UserBookへの同時リクエストでUNIQUE制約違反が起き得るため、
+`IntegrityError` を捕捉して `rollback()` 後に409を返すようにした。
+
+#### 動作確認
+
+作成・取得・おすすめ理由の更新・削除の正常系に加え、
+UserBookなし、ReadingPostなし、未認証、他人の投稿、
+不正なおすすめ理由、重複作成をテストした。
+`monkeypatch` でDBのUNIQUE制約違反相当の `IntegrityError` を再現し、
+409応答と `rollback()` 実行も確認した。
+既存機能を含む全133件のテストが成功した。
+
+#### 学んだこと
+
+1対1関係の `Mapped` 型、relationshipと外部キーの役割の違い、
+`DateTime(timezone=True)`、DB側の `server_default`、
+名前付きのUNIQUE・CHECK制約を確認した。
+また、事前チェックだけでは同時リクエストを防げず、
+DB制約を最後の保証とし、APIがDB例外を適切なHTTP応答へ変換する必要があると学んだ。
+
+#### 次につながること
+
+Phase 11 / Feature 9で、本人が読了投稿の
+公開・非公開を後から切り替えられるようにする。
