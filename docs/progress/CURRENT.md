@@ -30,18 +30,20 @@ Phase 11：読書サービス機能を1つずつ追加する
 
 ## 現在のStep
 
-Feature 8：読了投稿が完了。
+Feature 9：投稿公開設定が完了。
 
-UserBookと1対0..1のReadingPostを追加し、
-本人の完読済みUserBookに対するPOST・GET・PATCH・DELETEを実装しました。
-おすすめ理由は1〜1000文字、空白のみを禁止し、初期公開状態は公開です。
-おすすめ度はUserBookの値を使い、ReadingPostには重複保存しません。
-ReadingPostがある間はUserBookの削除と完読以外への状態変更を409で拒否します。
+本人の既存ReadingPostの `is_public` だけを変更する
+`PATCH /users/me/books/{book_id}/reading-post/visibility` を実装しました。
+おすすめ理由の更新と公開状態の更新は、
+APIと入力Schemaの役割を分けています。
 
-Migrationを開発用・テスト用DBへ適用済みで、
-既存機能を含む全133件の自動テストが成功しています。
+ReadingPostの `is_public` はFeature 8で追加済みのため、
+新しいModelとMigrationは追加していません。
+正常系、不正入力、未認証、他人の投稿、
+UserBookなし、ReadingPostなしを確認し、
+既存機能を含む全141件の自動テストが成功しています。
 
-次はFeature 9の投稿公開設定へ進みます。
+次はFeature 10のいいねへ進みます。
 
 ---
 
@@ -282,16 +284,16 @@ Pythonで小数第1位へ丸めて返します。
 
 # 現在行っていること
 
-Phase 11 / Feature 8のModel、Migration、Schema、Router、
+Phase 11 / Feature 9のSchema、Router、
 自動テストが完了しました。
-現在は、Feature 9の投稿公開設定へ進むところです。
+現在は、Feature 10のいいねへ進むところです。
 
 ---
 
 # 次に行うこと
 
-Feature 9で、本人が既存の読了投稿を
-公開・非公開に切り替えるAPIの要件と入力Schemaを設計します。
+Feature 10で、どのユーザーがどの公開投稿へ
+いいねしたかを保存するための要件とデータの関係を設計します。
 
 ---
 
@@ -299,13 +301,14 @@ Feature 9で、本人が既存の読了投稿を
 
 次回このプロジェクトを再開する場合は、
 
-**Phase 11 / Feature 9：投稿公開設定の要件を整理する**
+**Phase 11 / Feature 10：いいねの要件を整理する**
 
 から再開してください。
 
 現在の具体的な次の作業は、
 
-**公開状態のみを変更する専用SchemaとAPIパスを考えること**
+**いいねに必要なデータ、UserとReadingPostの関係、
+重複をどこで禁止するかを考えること**
 
 です。
 

@@ -19,3 +19,7 @@ class ReadingPostResponse(BaseModel):
 class ReadingPostUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
     recommendation_reason: str = Field(min_length=1, max_length=1000)
+
+
+class ReadingPostVisibilityUpdate(BaseModel):
+    is_public: bool
