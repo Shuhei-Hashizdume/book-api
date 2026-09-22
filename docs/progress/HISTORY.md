@@ -1991,3 +1991,45 @@ DB制約を最後の保証とし、APIがDB例外を適切なHTTP応答へ変換
 
 Phase 11 / Feature 9で、本人が読了投稿の
 公開・非公開を後から切り替えられるようにする。
+
+### Phase 11 / Feature 9：投稿公開設定
+
+#### 設計判断
+
+おすすめ理由の更新と公開状態の更新を分け、
+各APIの役割を明確にするため、公開状態専用の
+`PATCH /users/me/books/{book_id}/reading-post/visibility` を採用した。
+
+入力は `ReadingPostVisibilityUpdate` の `is_public: bool` だけとし、
+更新後は既存の `ReadingPostResponse` を返す。
+`is_public` はFeature 8でReadingPostに追加済みのため、
+ModelとMigrationは追加しない。
+
+#### 実施内容
+
+認証中のUser IDとBook IDの組み合わせで本人のUserBookを取得し、
+ReadingPostがある場合だけ `is_public` を更新するAPIを追加した。
+UserBookまたはReadingPostがない場合と、
+他ユーザーのデータに対する操作は404を返す。
+
+#### 動作確認
+
+公開から非公開への変更とDB保存、
+必須値なし・`null`・boolへ変換できない文字列の422を確認した。
+また、JWTなしの401、他ユーザーと対象不存在の404、
+失敗時に所有者の公開状態が変更されないことをテストした。
+
+読了投稿テスト40件、既存機能を含む全141件が成功した。
+
+#### 学んだこと
+
+`user_book.reading_post` はDBの関連行をPython上のReadingPost
+ORMオブジェクトとして取得すること、ローカル変数への代入は
+オブジェクトのコピーではなく同じオブジェクトへの参照であることを確認した。
+また、未認証は401、認証済みでも本人の対象がない場合は
+404とする認証と所有者確認の違いを確認した。
+
+#### 次につながること
+
+Phase 11 / Feature 10で、公開された読了投稿に対するいいねの
+要件、UserとReadingPostの関係、重複禁止の保証場所を設計する。

@@ -10,6 +10,7 @@ from schemas.reading_posts import (
     ReadingPostCreate,
     ReadingPostResponse,
     ReadingPostUpdate,
+    ReadingPostVisibilityUpdate,
 )
 
 router = APIRouter(prefix="/users/me/books", tags=["reading-posts"])
@@ -137,3 +138,34 @@ def delete_reading_post(book_id: int, current_user: CurrentUserDep, db: SessionD
 
     db.delete(reading_post)
     db.commit()
+
+
+@router.patch("/{book_id}/reading-post/visibility", response_model=ReadingPostResponse)
+def update_reading_post_visibility(
+    book_id: int,
+    reading_post_visibility_data: ReadingPostVisibilityUpdate,
+    db: SessionDep,
+    current_user: CurrentUserDep,
+):
+    statement = select(UserBook).where(
+        UserBook.book_id == book_id, UserBook.user_id == current_user.id
+    )
+    user_book = db.scalar(statement)
+
+    if user_book is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="本が見つかりません。"
+        )
+    if user_book.reading_post is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="読了投稿がありません。"
+        )
+
+    reading_post = user_book.reading_post
+
+    reading_post.is_public = reading_post_visibility_data.is_public
+
+    db.commit()
+    db.refresh(reading_post)
+
+    return reading_post

@@ -205,6 +205,155 @@ def test_update_reading_post(user_book_data, access_token, db_session):
     assert reading_post.is_public is False
 
 
+def test_update_reading_post_visibility(user_book_data, access_token, db_session):
+    user_book_response = client.post(
+        "/users/me/books",
+        json=user_book_data,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert user_book_response.status_code == 201
+    target_book_id = user_book_response.json()["book_id"]
+
+    status_response = client.patch(
+        f"/users/me/books/{target_book_id}/status",
+        json={"status": "completed", "recommendation_score": 5},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert status_response.status_code == 200
+
+    create_response = client.post(
+        f"/users/me/books/{target_book_id}/reading-post",
+        json={"recommendation_reason": "公開状態を変更する投稿"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert create_response.status_code == 201
+    created_post = create_response.json()
+    assert created_post["is_public"] is True
+
+    visibility_response = client.patch(
+        f"/users/me/books/{target_book_id}/reading-post/visibility",
+        json={"is_public": False},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert visibility_response.status_code == 200
+    updated_post = visibility_response.json()
+    assert updated_post["id"] == created_post["id"]
+    assert updated_post["is_public"] is False
+
+    reading_post = db_session.get(ReadingPost, created_post["id"])
+    assert reading_post is not None
+    assert reading_post.is_public is False
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"is_public": None},
+        {"is_public": "public"},
+    ],
+)
+def test_update_reading_post_visibility_rejects_invalid_is_public(
+    book_in_db, access_token, payload
+):
+    response = client.patch(
+        f"/users/me/books/{book_in_db.id}/reading-post/visibility",
+        json=payload,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_update_reading_post_visibility_unauthorized_without_token(book_in_db):
+    response = client.patch(
+        f"/users/me/books/{book_in_db.id}/reading-post/visibility",
+        json={"is_public": False},
+    )
+
+    assert response.status_code == 401
+
+
+def test_update_other_users_reading_post_visibility_returns_not_found(
+    user_book_data, access_token, other_access_token, db_session
+):
+    user_book_response = client.post(
+        "/users/me/books",
+        json=user_book_data,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert user_book_response.status_code == 201
+    target_book_id = user_book_response.json()["book_id"]
+
+    status_response = client.patch(
+        f"/users/me/books/{target_book_id}/status",
+        json={"status": "completed", "recommendation_score": 5},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert status_response.status_code == 200
+
+    create_response = client.post(
+        f"/users/me/books/{target_book_id}/reading-post",
+        json={"recommendation_reason": "所有者本人の公開投稿"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert create_response.status_code == 201
+    created_post = create_response.json()
+    assert created_post["is_public"] is True
+
+    response = client.patch(
+        f"/users/me/books/{target_book_id}/reading-post/visibility",
+        json={"is_public": False},
+        headers={"Authorization": f"Bearer {other_access_token}"},
+    )
+
+    assert response.status_code == 404
+
+    reading_post = db_session.get(ReadingPost, created_post["id"])
+    assert reading_post is not None
+    assert reading_post.is_public is True
+
+
+def test_update_reading_post_visibility_without_user_book_returns_not_found(
+    book_in_db, access_token
+):
+    response = client.patch(
+        f"/users/me/books/{book_in_db.id}/reading-post/visibility",
+        json={"is_public": False},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+
+
+def test_update_reading_post_visibility_without_reading_post_returns_not_found(
+    user_book_data, access_token
+):
+    user_book_response = client.post(
+        "/users/me/books",
+        json=user_book_data,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert user_book_response.status_code == 201
+    target_book_id = user_book_response.json()["book_id"]
+
+    response = client.patch(
+        f"/users/me/books/{target_book_id}/reading-post/visibility",
+        json={"is_public": False},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+
+
 def test_update_reading_post_without_reading_post_returns_not_found(
     user_book_data, access_token
 ):
