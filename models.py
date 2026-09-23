@@ -122,3 +122,26 @@ class ReadingPost(Base):
             name="ck_reading_posts_recommendation_reason_not_blank",
         ),
     )
+
+
+class Like(Base):
+    __tablename__ = "likes"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    reading_post_id: Mapped[int] = mapped_column(
+        ForeignKey("reading_posts.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "reading_post_id",
+            name="uq_likes_user_id_reading_post_id",
+        ),
+    )

@@ -2033,3 +2033,63 @@ ORMオブジェクトとして取得すること、ローカル変数への代�
 
 Phase 11 / Feature 10で、公開された読了投稿に対するいいねの
 要件、UserとReadingPostの関係、重複禁止の保証場所を設計する。
+
+### Phase 11 / Feature 10：いいね
+
+#### 設計判断
+
+Likeは、いいねしたUserと対象のReadingPostを結ぶ独立した
+`likes` テーブルとした。1人のUserは複数のLikeを持ち、
+1件のReadingPostも複数のLikeを持てる。
+1件のLikeは1人のUserと1件のReadingPostに所属する。
+
+Likeの存在自体をいいね済みの状態として扱い、`is_liked` は持たせない。
+同じUserが同じReadingPostへ複数回いいねできないよう、
+`user_id` と `reading_post_id` の組み合わせに複合UNIQUE制約を設けた。
+UserまたはReadingPostが削除された場合は、外部キーの
+`ON DELETE CASCADE` により関連するLikeも削除する。
+
+いいねと解除は、対象投稿をURLで明確にするため次のAPIとした。
+
+- `POST /reading-posts/{reading_post_id}/likes`
+- `DELETE /reading-posts/{reading_post_id}/likes`
+
+ログイン中のユーザーは、他ユーザーの公開投稿だけをいいねできる。
+自分の投稿は409、存在しない投稿と非公開投稿は404、
+重複いいねは409、本人のLikeがない解除は404とした。
+
+#### 実施内容
+
+`Like` Model、`LikeResponse` Schema、Like Router、
+Alembic migration `3e68536e19a9` を追加した。
+Migrationは開発用・テスト用PostgreSQLへ適用し、主キー、NOT NULL、
+複合UNIQUE制約、2つのCASCADE外部キー、作成日時の既定値を確認した。
+
+POSTでは通常の事前重複チェックに加え、同時リクエストによる
+UNIQUE制約違反に備えて `IntegrityError` を捕捉し、
+`rollback()` 後に409へ変換する。DELETEでは、ログイン中の
+ユーザーと対象投稿の組み合わせに一致するLikeだけを削除する。
+
+#### 動作確認
+
+作成・解除の正常系に加え、未認証、対象投稿なし、非公開投稿、
+自分の投稿、重複いいね、Likeなしの解除、他ユーザーのLikeを
+削除しないこと、DB制約違反時のrollbackを確認した。
+また、複合UNIQUE制約が別ユーザーによる同じ投稿へのいいねと、
+同じユーザーによる別投稿へのいいねを許可することも確認した。
+
+User削除時とReadingPost削除時にLikeがCASCADE削除されることを含め、
+Like機能のテスト17件、既存機能を含む全158件が成功した。
+
+#### 学んだこと
+
+Likeの存在を状態として表す設計、複合UNIQUE制約の対象範囲、
+2つの外部キーのどちらの親が削除されてもLike行全体が削除されること、
+事前SELECTとDB制約が異なる役割を持つことを確認した。
+また、セット内包表記を使い、DBから取得したLikeの
+`reading_post_id` を順序に依存せず比較する方法を確認した。
+
+#### 次につながること
+
+Phase 11 / Feature 11で、User同士のフォロー関係、
+重複フォローと自分自身へのフォローをどう扱うか設計する。
