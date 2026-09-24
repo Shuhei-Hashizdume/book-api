@@ -2093,3 +2093,79 @@ Likeの存在を状態として表す設計、複合UNIQUE制約の対象範囲�
 
 Phase 11 / Feature 11で、User同士のフォロー関係、
 重複フォローと自分自身へのフォローをどう扱うか設計する。
+
+### Phase 11 / Feature 11：フォロー
+
+#### 設計判断
+
+Followは、フォローするUserとフォローされるUserを結ぶ独立した
+`follows` テーブルとした。`follower_id` はフォローする側、
+`followed_id` はフォローされる側を表し、どちらも `users.id` を参照する。
+
+同じUser同士の重複フォローは、`follower_id` と `followed_id` の
+複合UNIQUE制約で禁止する。自己フォローはAPIで事前確認するとともに、
+`follower_id != followed_id` のCHECK制約をDBの最終保証とした。
+どちらのUserが削除された場合も、2本の外部キーに設定した
+`ON DELETE CASCADE` により関連するFollowを削除する。
+
+フォロー登録・解除は次のAPIとした。
+
+- `POST /users/{followed_user_id}/follow`
+- `DELETE /users/{followed_user_id}/follow`
+
+POST成功はFollow情報を201で返し、DELETE成功は本文なしの204とする。
+対象Userなしと本人のFollowなしは404、未認証は401、
+自己フォローと重複フォローは409とした。
+
+今回のAPI範囲は登録・解除だけとし、フォロー中・フォロワー一覧は
+Feature 12以降で必要性とレスポンスを設計する。
+
+#### 実施内容
+
+`Follow` Model、`FollowResponse` Schema、Follow Router、
+Alembic migration `8b0cbe61798d` を追加した。
+Migrationは開発用・テスト用PostgreSQLへ適用し、主キー、NOT NULL、
+複合UNIQUE、自己フォロー禁止CHECK、2本のCASCADE外部キー、
+作成日時の既定値を確認した。
+
+User側には `following_relationships` と `follower_relationships`、
+Follow側には `follower` と `followed` を追加した。
+同じ `users` テーブルへ2本の外部キーがあるため、各relationshipへ
+使用する `foreign_keys` と対応する `back_populates` を明示した。
+User側は複数のFollow、Follow側は各1人のUserとして型を定義し、
+DBのCASCADEと連携する削除設定も追加した。
+
+POSTでは対象User、自己フォロー、重複Followを事前確認する。
+同時リクエストによるUNIQUE制約違反に備え、`commit()`の
+`IntegrityError` を捕捉して `rollback()` 後に409へ変換する。
+DELETEでは、ログイン中のUserと対象Userの組み合わせに一致する
+本人のFollowだけを削除する。
+
+#### 動作確認
+
+登録・解除の正常系、未認証、対象Userなし、自己フォロー、重複、
+Followなしの解除、他ユーザーのFollowを削除できないこと、
+DB制約違反時のrollbackを確認した。
+
+複合UNIQUE制約が、同じUserによる異なるUserへのフォローと、
+異なるUserによる同じUserへのフォローを許可することを確認した。
+CHECK制約による自己フォロー拒否、4つのrelationship、
+フォローする側・される側それぞれのUser削除時のCASCADEもテストした。
+Follow機能のテスト17件、既存機能を含む全175件が成功した。
+
+#### 学んだこと
+
+同じテーブルを2本の外部キーで参照する自己参照関係では、
+`relationship()`へ使用する `foreign_keys` を明示する必要がある。
+User側は `Mapped[list["Follow"]]`、Follow側は `Mapped[User]` とし、
+複数と単数の関係を型で表すことを確認した。
+
+また、`Session.expire_all()`によって保持中のORM状態を期限切れにし、
+次の属性アクセス時にDBから最新状態を読み直す流れを確認した。
+`pytest.raises()`で期待するDB例外を捕捉し、`IntegrityError.orig`から
+原因となったCHECK制約まで確認する方法も学んだ。
+
+#### 次につながること
+
+Phase 11 / Feature 12で、ユーザープロフィール・公開本棚に表示する情報、
+完読冊数の集計範囲、公開するBookの条件と必要なAPIを設計する。

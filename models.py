@@ -42,6 +42,18 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     is_admin: Mapped[bool] = mapped_column(default=False, server_default=false())
+    following_relationships: Mapped[list["Follow"]] = relationship(
+        back_populates="follower",
+        foreign_keys="Follow.follower_id",
+        cascade="all, delete",
+        passive_deletes=True,
+    )
+    follower_relationships: Mapped[list["Follow"]] = relationship(
+        back_populates="followed",
+        foreign_keys="Follow.followed_id",
+        cascade="all, delete",
+        passive_deletes=True,
+    )
 
 
 class UserBook(Base):
@@ -143,5 +155,35 @@ class Like(Base):
             "user_id",
             "reading_post_id",
             name="uq_likes_user_id_reading_post_id",
+        ),
+    )
+
+
+class Follow(Base):
+    __tablename__ = "follows"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    follower_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    followed_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    follower: Mapped[User] = relationship(
+        back_populates="following_relationships",
+        foreign_keys=[follower_id],
+    )
+    followed: Mapped[User] = relationship(
+        back_populates="follower_relationships", foreign_keys=[followed_id]
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "follower_id", "followed_id", name="uq_follows_follower_id_followed_id"
+        ),
+        CheckConstraint(
+            "follower_id != followed_id", name="ck_follows_different_users"
         ),
     )
