@@ -42,6 +42,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     is_admin: Mapped[bool] = mapped_column(default=False, server_default=false())
+    bio: Mapped[str | None] = mapped_column(Text)
     following_relationships: Mapped[list["Follow"]] = relationship(
         back_populates="follower",
         foreign_keys="Follow.follower_id",
@@ -53,6 +54,16 @@ class User(Base):
         foreign_keys="Follow.followed_id",
         cascade="all, delete",
         passive_deletes=True,
+    )
+    __table_args__ = (
+        CheckConstraint(
+            "bio IS NULL OR char_length(bio) BETWEEN 1 AND 160",
+            name="ck_users_bio_range",
+        ),
+        CheckConstraint(
+            "bio IS NULL OR bio ~ '[^[:space:]]'",
+            name="ck_users_bio_not_blank",
+        ),
     )
 
 

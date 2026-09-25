@@ -12,6 +12,7 @@ class ReadingPostCreate(BaseModel):
 class ReadingPostResponse(BaseModel):
     id: int
     recommendation_reason: str
+    recommendation_score: int
     is_public: bool
     created_at: datetime
 

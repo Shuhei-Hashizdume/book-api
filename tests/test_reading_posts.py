@@ -41,6 +41,7 @@ def test_create_reading_post(user_book_data, access_token, db_session):
     assert create_reading_post_response_data["is_public"] is True
     assert isinstance(create_reading_post_response_data["id"], int)
     assert create_reading_post_response_data["created_at"] is not None
+    assert create_reading_post_response_data["recommendation_score"] == 5
 
     reading_post = db_session.get(ReadingPost, create_reading_post_response_data["id"])
     assert reading_post is not None
@@ -84,6 +85,53 @@ def test_get_reading_post(user_book_data, access_token):
 
     assert get_response.status_code == 200
     assert get_response.json() == create_response.json()
+
+
+def test_get_reading_post_returns_current_recommendation_score(
+    user_book_data, access_token
+):
+    user_book_response = client.post(
+        "/users/me/books",
+        json=user_book_data,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert user_book_response.status_code == 201
+    target_book_id = user_book_response.json()["book_id"]
+
+    status_response = client.patch(
+        f"/users/me/books/{target_book_id}/status",
+        json={"status": "completed", "recommendation_score": 5},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert status_response.status_code == 200
+
+    create_response = client.post(
+        f"/users/me/books/{target_book_id}/reading-post",
+        json={"recommendation_reason": "現在のおすすめ度を確認する投稿"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert create_response.status_code == 201
+    assert create_response.json()["recommendation_score"] == 5
+
+    score_response = client.patch(
+        f"/users/me/books/{target_book_id}/recommendation-score",
+        json={"recommendation_score": 3},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert score_response.status_code == 200
+
+    get_response = client.get(
+        f"/users/me/books/{target_book_id}/reading-post",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert get_response.status_code == 200
+    assert get_response.json()["id"] == create_response.json()["id"]
+    assert get_response.json()["recommendation_score"] == 3
 
 
 def test_get_reading_post_without_user_book_returns_not_found(book_in_db, access_token):
