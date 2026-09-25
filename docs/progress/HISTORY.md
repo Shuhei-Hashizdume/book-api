@@ -2169,3 +2169,60 @@ User側は `Mapped[list["Follow"]]`、Follow側は `Mapped[User]` とし、
 
 Phase 11 / Feature 12で、ユーザープロフィール・公開本棚に表示する情報、
 完読冊数の集計範囲、公開するBookの条件と必要なAPIを設計する。
+
+### Phase 11 / Feature 12：ユーザープロフィール・公開本棚
+
+#### 設計判断
+
+未ログインユーザーも閲覧できる公開APIとして、
+`GET /users/{user_id}/profile` を採用した。
+レスポンスはユーザー名、bio、完読冊数、フォロワー数、
+公開本棚を含む。完読冊数は非公開分も数え、
+公開本棚は公開ReadingPostがある本だけを新着順で返す。
+
+プロフィール画像はバックエンドで保存せず、現時点では
+フロントエンドの既定画像で表示する方針とした。
+UserにNULL許可の `bio` を追加し、1〜160文字とし、
+空白のみの値をDBのCHECK制約で禁止した。
+
+複数テーブルの取得・集計とレスポンス構築を行うため、
+処理は `services/profile.py` へ分離し、RouterはHTTP入出力と
+Serviceが返した `None` の404への変換を担当する構成とした。
+
+#### 実施内容
+
+UserのbioとCHECK制約を追加するAlembic migration
+`6a686afe7bbf` を開発用・テスト用DBに適用した。
+`UserProfileResponse` と `PublicBookshelfBookResponse`、
+Profile Service、Profile Routerを追加し、`main.py` へ登録した。
+
+公開本棚はUserBook、Book、ReadingPostをJOINし、
+必要なカラムだけを選択して `mappings()` でキー付きの行として取得し、
+Schemaへキーワード引数として渡した。
+
+ReadingPostのレスポンスに現在の
+`UserBook.recommendation_score` を含めるため、
+共通の `_build_reading_post_response()` を追加した。
+
+#### 動作確認
+
+プロフィールの全項目、存在しないUserの404、bio・件数・公開本が
+空の状態、非公開ReadingPostの除外、公開本の新着順を確認した。
+bioの161文字と空白のみをDB制約が拒否し、
+`rollback()` 後も不正値が保存されないことも確認した。
+
+追加したテスト8件を含め、既存機能を含む全183件が成功した。
+
+#### 学んだこと
+
+ORMクラスのカラム属性はSQL条件を作る表現として使えること、
+JOINしたModelのカラムをWHERE条件に使えること、
+`execute()`・`mappings()`・`all()`の役割を確認した。
+また、外部キーで参照する子データを親より先に削除する必要と、
+`try / finally` によるテストデータの後片付けも確認した。
+
+#### 次につながること
+
+Phase 11 / Feature 13で、全ユーザーの公開投稿を表示する
+「おすすめ」と、フォロー中ユーザーの公開投稿を表示する
+「フォロー中」のタイムラインを設計する。

@@ -16,6 +16,20 @@ from schemas.reading_posts import (
 router = APIRouter(prefix="/users/me/books", tags=["reading-posts"])
 
 
+def _build_reading_post_response(
+    user_book: UserBook, reading_post: ReadingPost
+) -> ReadingPostResponse:
+    reading_post_response = ReadingPostResponse(
+        id=reading_post.id,
+        recommendation_reason=reading_post.recommendation_reason,
+        recommendation_score=user_book.recommendation_score,
+        is_public=reading_post.is_public,
+        created_at=reading_post.created_at,
+    )
+
+    return reading_post_response
+
+
 @router.post(
     "/{book_id}/reading-post",
     response_model=ReadingPostResponse,
@@ -66,7 +80,7 @@ def create_reading_post(
         )
     db.refresh(reading_post)
 
-    return reading_post
+    return _build_reading_post_response(user_book, reading_post)
 
 
 @router.get("/{book_id}/reading-post", response_model=ReadingPostResponse)
@@ -86,7 +100,7 @@ def get_reading_post(book_id: int, db: SessionDep, current_user: CurrentUserDep)
             status_code=status.HTTP_404_NOT_FOUND, detail="読了投稿がありません。"
         )
 
-    return user_book.reading_post
+    return _build_reading_post_response(user_book, user_book.reading_post)
 
 
 @router.patch("/{book_id}/reading-post", response_model=ReadingPostResponse)
@@ -116,7 +130,7 @@ def update_reading_post(
     db.commit()
     db.refresh(reading_post)
 
-    return reading_post
+    return _build_reading_post_response(user_book, reading_post)
 
 
 @router.delete("/{book_id}/reading-post", status_code=status.HTTP_204_NO_CONTENT)
@@ -168,4 +182,4 @@ def update_reading_post_visibility(
     db.commit()
     db.refresh(reading_post)
 
-    return reading_post
+    return _build_reading_post_response(user_book, reading_post)

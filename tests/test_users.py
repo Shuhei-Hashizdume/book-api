@@ -1,5 +1,7 @@
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from main import app
 from models import User
@@ -69,3 +71,29 @@ def test_login_user_with_wrong_password(registered_user, user_data):
     )
 
     assert response.status_code == 401
+
+
+def test_database_rejects_bio_longer_than_160_characters(
+    registered_user, db_session
+):
+    registered_user.bio = "a" * 161
+
+    with pytest.raises(IntegrityError) as error_info:
+        db_session.commit()
+
+    assert "ck_users_bio_range" in str(error_info.value.orig)
+    db_session.rollback()
+    db_session.refresh(registered_user)
+    assert registered_user.bio is None
+
+
+def test_database_rejects_blank_bio(registered_user, db_session):
+    registered_user.bio = "   "
+
+    with pytest.raises(IntegrityError) as error_info:
+        db_session.commit()
+
+    assert "ck_users_bio_not_blank" in str(error_info.value.orig)
+    db_session.rollback()
+    db_session.refresh(registered_user)
+    assert registered_user.bio is None
