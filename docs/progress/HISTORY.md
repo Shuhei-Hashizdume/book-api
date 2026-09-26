@@ -2226,3 +2226,63 @@ JOINしたModelのカラムをWHERE条件に使えること、
 Phase 11 / Feature 13で、全ユーザーの公開投稿を表示する
 「おすすめ」と、フォロー中ユーザーの公開投稿を表示する
 「フォロー中」のタイムラインを設計する。
+
+### Phase 11 / Feature 13：タイムライン
+
+#### 設計判断
+
+タイムラインは新しいデータを保存せず、ReadingPost、UserBook、
+Book、User、Followの既存データをJOINして構築するため、
+新しいModel・テーブル・Migrationは追加しない。
+
+認証条件と取得条件を明確に分けるため、
+次の2つのAPIを採用した。
+
+- `GET /timeline/recommended`：未ログインでも閲覧可能
+- `GET /timeline/following`：ログイン必須
+
+おすすめは全ユーザーの公開ReadingPost、フォロー中は
+ログイン中ユーザーがフォローしている相手の公開ReadingPostだけを、
+どちらも `ReadingPost.created_at` の降順で返す。
+
+両APIは同じ `TimelinePostResponse` を使い、ReadingPost ID、
+投稿者のUser ID・ユーザー名、Book ID・タイトル、現在のおすすめ度、
+おすすめ理由、投稿日時を返す。
+
+#### 実施内容
+
+`schemas/timelines.py`、`services/timelines.py`、`routers/timelines.py`、
+`tests/test_timelines.py` を追加し、Routerを `main.py` へ登録した。
+
+Serviceでは、ReadingPostを起点にUserBookを経由して
+BookとUserをJOINする共通Statementを
+`_build_base_timeline_statement()` で組み立てる。
+おすすめは公開条件を追加し、フォロー中はさらに
+`Follow.followed_id == User.id` でFollowをJOINし、
+`Follow.follower_id == current_user.id` で閲覧者のフォロー関係へ絞り込む。
+
+Statementを `db.execute()` で実行し、`mappings().all()` で取得した
+RowMappingを1件ずつ `TimelinePostResponse` へ変換して返す。
+
+#### 動作確認
+
+おすすめの全項目、非公開投稿の除外、新着順、0件時の空リスト、
+未認証での閲覧を確認した。フォロー中は全項目、非公開投稿の除外、
+未フォローユーザーの除外、未認証の401、新着順を確認した。
+
+タイムラインテスト9件、既存機能を含む全192件が成功した。
+
+#### 学んだこと
+
+JOINはORMオブジェクトを順番に取得する処理ではなく、
+複数テーブルの行をどの条件で接続するかを定義する処理である。
+`select()`・`select_from()`・`join()`・`where()`・`order_by()` は
+Statementの設計図を作り、`db.execute()` で初めてDBへ問い合わせる。
+
+また、リスト内包表記は実際のリストを作り、
+`list[TimelinePostResponse]` はリストの要素型を表す型情報であることも確認した。
+
+#### 次につながること
+
+Phase 11 / Feature 14で、現在のBook・ジャンル・平均おすすめ度を使った
+単純な関連書籍レコメンドを設計する。
