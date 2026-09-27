@@ -71,6 +71,17 @@ def _parse_google_book(item: dict) -> BookSearchResult | None:
     main_category = volume_info.get("mainCategory")
     categories = volume_info.get("categories", [])
     category = main_category
+
+    image_links = volume_info.get("imageLinks", {})
+    if "small" in image_links:
+        cover_image_url = image_links.get("small")
+    elif "thumbnail" in image_links:
+        cover_image_url = image_links.get("thumbnail")
+    elif "smallThumbnail" in image_links:
+        cover_image_url = image_links.get("smallThumbnail")
+    else:
+        cover_image_url = None
+
     if not category and categories:
         category = categories[0]
 
@@ -92,6 +103,7 @@ def _parse_google_book(item: dict) -> BookSearchResult | None:
         author=author,
         isbn=isbn,
         genre=genre,
+        cover_image_url=cover_image_url,
     )
     return search_result
 

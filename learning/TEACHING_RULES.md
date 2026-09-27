@@ -759,7 +759,7 @@ Codexがコードを追加または変更した場合、
 開発順序については、
 
 ```text
-docs/ROADMAP.md
+learning/ROADMAP.md
 ```
 
 を参照してください。
@@ -991,7 +991,7 @@ Codexは、その場のコードが動くことだけを基準に実装方法を
 
 を優先してください。
 
-`docs/ROADMAP.md` と本ファイル `docs/TEACHING_RULES.md` を組み合わせ、
+`learning/ROADMAP.md` と本ファイル `learning/TEACHING_RULES.md` を組み合わせ、
 
 **「実際にアプリを一から開発する経験」と「バックエンド技術を正確に理解する講義」**
 

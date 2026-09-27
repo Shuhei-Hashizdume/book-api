@@ -29,4 +29,5 @@ def get_book_with_average_score(book_id: int, db: Session) -> BookDetailResponse
         author=book.author,
         genre=book.genre,
         average_recommendation_score=rounded_average_score,
+        cover_image_url=book.cover_image_url,
     )

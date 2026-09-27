@@ -25,6 +25,7 @@ def test_read_books_returns_books(book_in_db):
             "id": book_in_db.id,
             "title": "テスト用の本",
             "author": "テスト著者",
+            "cover_image_url": None,
         }
     ]
 
@@ -37,9 +38,38 @@ def test_read_book_returns_detail_without_recommendation_score(book_in_db):
         "id": book_in_db.id,
         "title": "テスト用の本",
         "author": "テスト著者",
+        "cover_image_url": None,
         "genre": "other",
         "average_recommendation_score": None,
     }
+
+
+def test_read_book_returns_cover_image_url(db_session):
+    book = Book(
+        title="表紙画像のある本",
+        author="テスト著者",
+        isbn="9780000000016",
+        cover_image_url="https://example.com/book-cover.jpg",
+    )
+    db_session.add(book)
+    db_session.commit()
+    db_session.refresh(book)
+
+    try:
+        response = client.get(f"/books/{book.id}")
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "id": book.id,
+            "title": "表紙画像のある本",
+            "author": "テスト著者",
+            "cover_image_url": "https://example.com/book-cover.jpg",
+            "genre": "other",
+            "average_recommendation_score": None,
+        }
+    finally:
+        db_session.delete(book)
+        db_session.commit()
 
 
 def test_read_book_returns_average_recommendation_score(

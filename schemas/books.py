@@ -38,6 +38,7 @@ class BookResponse(BaseModel):
     id: int
     title: str
     author: str
+    cover_image_url: str | None
 
 
 class BookSearchResult(BaseModel):
@@ -46,6 +47,7 @@ class BookSearchResult(BaseModel):
     author: str
     isbn: str
     genre: BookGenre
+    cover_image_url: str | None
 
 
 class BookDetailResponse(BookResponse):

@@ -18,7 +18,7 @@ Codexは学習・開発を再開するとき、このファイルを確認し、
 このファイルは履歴を長期間蓄積するためのものではありません。
 
 過去の重要な完了事項・設計判断・問題と解決などは、
-`docs/progress/HISTORY.md` に記録します。
+`learning/progress/HISTORY.md` に記録します。
 
 ---
 
@@ -30,18 +30,17 @@ Phase 11：読書サービス機能を1つずつ追加する
 
 ## 現在のStep
 
-Feature 13：タイムラインが完了。
+Feature 14：関連書籍レコメンドの前提となる表紙画像対応が完了。
 
-未ログインで全ユーザーの公開投稿を新着順で取得する
-`GET /timeline/recommended` と、ログイン中ユーザーが
-フォローしている相手の公開投稿だけを新着順で取得する
-`GET /timeline/following` を実装しました。
+Google Booksの `small`、`thumbnail`、`smallThumbnail` の順に
+利用可能な表紙画像URLを選び、NULL許可の `Book.cover_image_url` へ
+保存する処理を追加しました。
 
-既存テーブルのJOINだけで実現し、新しいModel・Migrationはありません。
-タイムラインの自動テスト9件を追加し、
-既存機能を含む全192件が成功しています。
+検索結果、書籍詳細、マイ本棚、タイムライン、公開本棚で
+表紙画像URLを返せる状態になっています。
+既存機能を含む全198件のテストが成功しています。
 
-次はFeature 14の関連書籍レコメンドへ進みます。
+次は関連書籍レコメンド自体の取得条件とAPIを設計します。
 
 ---
 
@@ -49,14 +48,14 @@ Feature 13：タイムラインが完了。
 
 以下のプロジェクト方針文書を作成済みです。
 
-- `docs/ROADMAP.md`
-- `docs/TEACHING_RULES.md`
-- `docs/DEVELOPMENT_LEARNING_POLICY.md`
+- `learning/ROADMAP.md`
+- `learning/TEACHING_RULES.md`
+- `learning/DEVELOPMENT_LEARNING_POLICY.md`
 
 以下の進捗管理ファイルを作成済みです。
 
-- `docs/progress/CURRENT.md`
-- `docs/progress/HISTORY.md`
+- `learning/progress/CURRENT.md`
+- `learning/progress/HISTORY.md`
 
 Codexへの常設指示を記述した、
 `AGENTS.md` も作成済みです。
@@ -314,15 +313,16 @@ Phase 11 / Feature 13で、全ユーザーの公開投稿を取得する
 
 # 現在行っていること
 
-Phase 11 / Feature 13のSchema、Service、Router、自動テストが完了しました。
-現在は、Feature 14の関連書籍レコメンドへ進むところです。
+Phase 11 / Feature 14の前提として、Google Booksの表紙画像URLの
+取得・保存と、既存の書籍表示APIへの追加が完了しました。
+現在は、関連書籍レコメンド自体の設計へ進むところです。
 
 ---
 
 # 次に行うこと
 
-Feature 14で、現在のBook・ジャンル・平均おすすめ度で実現できる
-単純な関連書籍レコメンドの条件とAPIを設計します。
+現在のBook・代表ジャンル・平均おすすめ度で実現できる
+単純な関連書籍レコメンドの取得条件とAPIレスポンスを設計します。
 
 ---
 
@@ -370,7 +370,7 @@ Starlette 1.6.0内部で、AnyIO 4.15.0が非推奨とした
 **古い現在地を残し続けるのではなく、最新の状態がすぐ分かるように整理してください。**
 
 長期的に残す必要がある情報は、
-`docs/progress/HISTORY.md` へ移してください。
+`learning/progress/HISTORY.md` へ移してください。
 
 ---
 
