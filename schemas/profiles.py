@@ -11,6 +11,7 @@ class PublicBookshelfBookResponse(BaseModel):
     genre: BookGenre
     recommendation_score: int
     recommendation_reason: str
+    cover_image_url: str | None
 
 
 class UserProfileResponse(BaseModel):

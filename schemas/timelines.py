@@ -12,3 +12,4 @@ class TimelinePostResponse(BaseModel):
     recommendation_score: int
     recommendation_reason: str
     created_at: datetime
+    cover_image_url: str | None

@@ -261,11 +261,15 @@ def create_user_book_from_search(
                 author=google_book.author,
                 isbn=google_book.isbn,
                 genre=google_book.genre,
+                cover_image_url=google_book.cover_image_url,
             )
             db.add(book)
             db.flush()
-        elif book.genre == BookGenre.OTHER and google_book.genre != BookGenre.OTHER:
-            book.genre = google_book.genre
+        else:
+            if book.genre == BookGenre.OTHER and google_book.genre != BookGenre.OTHER:
+                book.genre = google_book.genre
+            if book.cover_image_url is None and google_book.cover_image_url is not None:
+                book.cover_image_url = google_book.cover_image_url
 
         user_book = UserBook(
             user_id=current_user.id,

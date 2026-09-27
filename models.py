@@ -33,6 +33,7 @@ class Book(Base):
         unique=True,
         nullable=True,
     )
+    cover_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class User(Base):

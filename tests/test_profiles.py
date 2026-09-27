@@ -12,6 +12,10 @@ client = TestClient(app)
 def test_read_user_profile(registered_user, other_user, book_in_db, db_session):
     registered_user.bio = "宜しくお願いします。"
 
+    book = db_session.get(Book, book_in_db.id)
+    assert book is not None
+    book.cover_image_url = "https://example.com/public-bookshelf-cover.jpg"
+
     user_book = UserBook(
         user_id=registered_user.id,
         book_id=book_in_db.id,
@@ -55,6 +59,10 @@ def test_read_user_profile(registered_user, other_user, book_in_db, db_session):
         assert public_book["title"] == book_in_db.title
         assert public_book["author"] == book_in_db.author
         assert public_book["genre"] == book_in_db.genre.value
+        assert (
+            public_book["cover_image_url"]
+            == "https://example.com/public-bookshelf-cover.jpg"
+        )
         assert public_book["recommendation_score"] == 5
         assert public_book["recommendation_reason"] == "テスト用のおすすめ理由"
     finally:
@@ -179,6 +187,10 @@ def test_read_user_profile_orders_public_books_by_newest_post(
         assert [book["reading_post_id"] for book in response_data["public_books"]] == [
             newer_post.id,
             older_post.id,
+        ]
+        assert [book["cover_image_url"] for book in response_data["public_books"]] == [
+            None,
+            None,
         ]
     finally:
         db_session.delete(newer_post)

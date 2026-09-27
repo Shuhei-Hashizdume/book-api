@@ -12,6 +12,7 @@ def _build_base_timeline_statement():
             User.username,
             Book.id.label("book_id"),
             Book.title,
+            Book.cover_image_url,
             UserBook.recommendation_score,
             ReadingPost.recommendation_reason,
             ReadingPost.created_at,

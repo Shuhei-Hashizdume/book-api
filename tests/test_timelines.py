@@ -4,12 +4,16 @@ from fastapi.testclient import TestClient
 
 from enums import ReadingPriority, ReadingStatus
 from main import app
-from models import Follow, ReadingPost, UserBook
+from models import Book, Follow, ReadingPost, UserBook
 
 client = TestClient(app)
 
 
 def test_read_recommended_timeline(registered_user, book_in_db, db_session):
+    book = db_session.get(Book, book_in_db.id)
+    assert book is not None
+    book.cover_image_url = "https://example.com/recommended-book-cover.jpg"
+
     user_book = UserBook(
         user_id=registered_user.id,
         book_id=book_in_db.id,
@@ -43,6 +47,10 @@ def test_read_recommended_timeline(registered_user, book_in_db, db_session):
         assert timeline_post["username"] == registered_user.username
         assert timeline_post["book_id"] == book_in_db.id
         assert timeline_post["title"] == book_in_db.title
+        assert (
+            timeline_post["cover_image_url"]
+            == "https://example.com/recommended-book-cover.jpg"
+        )
         assert timeline_post["recommendation_score"] == 5
         assert timeline_post["recommendation_reason"] == "タイムラインで紹介する本"
         assert timeline_post["created_at"] is not None
@@ -174,6 +182,10 @@ def test_recommended_timeline_returns_empty_list_without_posts():
 def test_read_following_timeline(
     registered_user, other_user, book_in_db, db_session, access_token
 ):
+    book = db_session.get(Book, book_in_db.id)
+    assert book is not None
+    book.cover_image_url = "https://example.com/following-book-cover.jpg"
+
     follow = Follow(
         follower_id=registered_user.id,
         followed_id=other_user.id,
@@ -214,6 +226,10 @@ def test_read_following_timeline(
         assert timeline_post["username"] == other_user.username
         assert timeline_post["book_id"] == book_in_db.id
         assert timeline_post["title"] == book_in_db.title
+        assert (
+            timeline_post["cover_image_url"]
+            == "https://example.com/following-book-cover.jpg"
+        )
         assert timeline_post["recommendation_score"] == 5
         assert timeline_post["recommendation_reason"] == (
             "フォロー中タイムラインで紹介する本"

@@ -30,6 +30,7 @@ def test_search_books_returns_results(monkeypatch):
                 author="奥浩哉",
                 isbn="9784086196123",
                 genre=BookGenre.MANGA,
+                cover_image_url="https://example.com/gantz-small.jpg",
             )
         ]
 
@@ -52,6 +53,7 @@ def test_search_books_returns_results(monkeypatch):
             "author": "奥浩哉",
             "isbn": "9784086196123",
             "genre": "manga",
+            "cover_image_url": "https://example.com/gantz-small.jpg",
         }
     ]
 
@@ -217,8 +219,61 @@ def test_search_google_books_formats_results(monkeypatch):
             author="著者A / 著者B",
             isbn="9784086196123",
             genre=BookGenre.MANGA,
+            cover_image_url=None,
         )
     ]
+
+
+@pytest.mark.parametrize(
+    ("image_links", "expected_cover_image_url"),
+    [
+        (
+            {
+                "small": "https://example.com/small.jpg",
+                "thumbnail": "https://example.com/thumbnail.jpg",
+                "smallThumbnail": "https://example.com/small-thumbnail.jpg",
+            },
+            "https://example.com/small.jpg",
+        ),
+        (
+            {
+                "thumbnail": "https://example.com/thumbnail.jpg",
+                "smallThumbnail": "https://example.com/small-thumbnail.jpg",
+            },
+            "https://example.com/thumbnail.jpg",
+        ),
+        (
+            {
+                "smallThumbnail": "https://example.com/small-thumbnail.jpg",
+            },
+            "https://example.com/small-thumbnail.jpg",
+        ),
+        ({}, None),
+    ],
+)
+def test_parse_google_book_selects_cover_image_url(
+    image_links,
+    expected_cover_image_url,
+):
+    item = {
+        "id": "google-book-id",
+        "volumeInfo": {
+            "title": "テスト本",
+            "authors": ["テスト著者"],
+            "industryIdentifiers": [
+                {
+                    "type": "ISBN_13",
+                    "identifier": "9780000000001",
+                }
+            ],
+            "imageLinks": image_links,
+        },
+    }
+
+    result = google_books._parse_google_book(item)
+
+    assert result is not None
+    assert result.cover_image_url == expected_cover_image_url
 
 
 def test_search_google_books_returns_empty_list_when_no_results(monkeypatch):
@@ -332,6 +387,7 @@ def test_search_google_books_excludes_incomplete_results(monkeypatch):
             author="著者",
             isbn="9780000000005",
             genre=BookGenre.OTHER,
+            cover_image_url=None,
         )
     ]
 
@@ -395,6 +451,7 @@ def test_get_google_books(monkeypatch):
         author="著者A / 著者B",
         isbn="9780000000001",
         genre=BookGenre.BUSINESS,
+        cover_image_url=None,
     )
 
 

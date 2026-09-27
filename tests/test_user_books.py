@@ -91,7 +91,12 @@ def test_create_user_book_rejects_invalid_priority(user_book_data, access_token)
     assert response.status_code == 422
 
 
-def test_read_user_books(user_book_data, access_token, book_in_db):
+def test_read_user_books(user_book_data, access_token, book_in_db, db_session):
+    book = db_session.get(Book, book_in_db.id)
+    assert book is not None
+    book.cover_image_url = "https://example.com/my-bookshelf-cover.jpg"
+    db_session.commit()
+
     post_response = client.post(
         "/users/me/books",
         json=user_book_data,
@@ -112,6 +117,10 @@ def test_read_user_books(user_book_data, access_token, book_in_db):
     assert get_response_data[0]["book"]["title"] == book_in_db.title
     assert get_response_data[0]["book"]["id"] == book_in_db.id
     assert get_response_data[0]["book"]["author"] == book_in_db.author
+    assert (
+        get_response_data[0]["book"]["cover_image_url"]
+        == "https://example.com/my-bookshelf-cover.jpg"
+    )
     assert len(get_response_data) == 1
 
 
@@ -138,6 +147,7 @@ def test_read_user_book_detail_returns_registered_state(
             "id": book_in_db.id,
             "title": "テスト用の本",
             "author": "テスト著者",
+            "cover_image_url": None,
             "genre": "other",
             "average_recommendation_score": None,
         },
@@ -163,6 +173,7 @@ def test_read_user_book_detail_returns_unregistered_state(
             "id": book_in_db.id,
             "title": "テスト用の本",
             "author": "テスト著者",
+            "cover_image_url": None,
             "genre": "other",
             "average_recommendation_score": None,
         },
@@ -535,6 +546,7 @@ def test_create_user_book_from_search_creates_book_and_user_book(
             author="著者A / 著者B",
             isbn="9780000000011",
             genre=BookGenre.MANGA,
+            cover_image_url="https://example.com/new-book-small.jpg",
         )
 
     monkeypatch.setattr(
@@ -574,6 +586,7 @@ def test_create_user_book_from_search_creates_book_and_user_book(
     assert saved_book.author == "著者A / 著者B"
     assert saved_book.isbn == "9780000000011"
     assert saved_book.genre == BookGenre.MANGA
+    assert saved_book.cover_image_url == "https://example.com/new-book-small.jpg"
 
     saved_user_book = db_session.get(UserBook, response_data["id"])
 
@@ -619,6 +632,7 @@ def test_create_user_book_from_search_reuses_existing_book(
             author="Google Books側の著者",
             isbn="9780000000012",
             genre=BookGenre.BUSINESS,
+            cover_image_url="https://example.com/existing-book-small.jpg",
         )
 
     monkeypatch.setattr(
@@ -651,6 +665,70 @@ def test_create_user_book_from_search_reuses_existing_book(
     assert existing_book.author == existing_author
     assert existing_book.isbn == "9780000000012"
     assert existing_book.genre == BookGenre.BUSINESS
+    assert (
+        existing_book.cover_image_url
+        == "https://example.com/existing-book-small.jpg"
+    )
+
+    db_session.delete(saved_user_book)
+    db_session.flush()
+    db_session.delete(existing_book)
+    db_session.commit()
+
+
+def test_create_user_book_from_search_preserves_existing_cover_image_url(
+    monkeypatch,
+    access_token,
+    db_session,
+):
+    existing_book = Book(
+        title="画像設定済みの本",
+        author="著者A",
+        isbn="9780000000015",
+        cover_image_url="https://example.com/saved-cover.jpg",
+    )
+    db_session.add(existing_book)
+    db_session.commit()
+    db_session.refresh(existing_book)
+
+    existing_book_id = existing_book.id
+
+    def fake_get_google_book(external_id: str) -> BookSearchResult:
+        assert external_id == "book-with-existing-cover"
+
+        return BookSearchResult(
+            external_id="book-with-existing-cover",
+            title="Google Books側のタイトル",
+            author="Google Books側の著者",
+            isbn="9780000000015",
+            genre=BookGenre.OTHER,
+            cover_image_url="https://example.com/google-cover.jpg",
+        )
+
+    monkeypatch.setattr(
+        user_books,
+        "get_google_book",
+        fake_get_google_book,
+    )
+
+    response = client.post(
+        "/users/me/books/from-search",
+        json={
+            "external_id": "book-with-existing-cover",
+            "priority": "medium",
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 201
+    response_data = response.json()
+    assert response_data["book_id"] == existing_book_id
+
+    saved_user_book = db_session.get(UserBook, response_data["id"])
+    assert saved_user_book is not None
+
+    db_session.refresh(existing_book)
+    assert existing_book.cover_image_url == "https://example.com/saved-cover.jpg"
 
     db_session.delete(saved_user_book)
     db_session.flush()
@@ -684,6 +762,7 @@ def test_create_user_book_from_search_preserves_existing_genre(
             author="Google Books側の著者",
             isbn="9780000000014",
             genre=BookGenre.BUSINESS,
+            cover_image_url=None,
         )
 
     monkeypatch.setattr(
@@ -732,6 +811,7 @@ def test_create_user_book_from_search_returns_conflict_for_duplicate(
             author="重複確認用の著者",
             isbn="9780000000013",
             genre=BookGenre.MANGA,
+            cover_image_url=None,
         )
 
     monkeypatch.setattr(

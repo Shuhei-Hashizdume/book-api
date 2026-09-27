@@ -30,6 +30,7 @@ def get_user_profile(user_id: int, db: Session) -> UserProfileResponse | None:
             Book.title,
             Book.author,
             Book.genre,
+            Book.cover_image_url,
             UserBook.recommendation_score,
             ReadingPost.recommendation_reason,
         )
