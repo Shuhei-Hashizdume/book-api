@@ -792,7 +792,7 @@ HTTPSやセキュリティを整える
 
 # 20. ROADMAPは絶対的な手順書ではない
 
-`docs/ROADMAP.md` は開発・学習の基準となる重要な文書ですが、
+`learning/ROADMAP.md` は開発・学習の基準となる重要な文書ですが、
 
 **実務的に不合理な工程まで機械的に実行するための手順書ではありません。**
 
@@ -830,15 +830,15 @@ HTTPSやセキュリティを整える
 このプロジェクトでは、以下の3文書を役割分担して使用してください。
 
 ```text
-docs/ROADMAP.md
+learning/ROADMAP.md
     ↓
 何を、どの順番で開発するか
 
-docs/TEACHING_RULES.md
+learning/TEACHING_RULES.md
     ↓
 どのように説明・指導するか
 
-docs/DEVELOPMENT_LEARNING_POLICY.md
+learning/DEVELOPMENT_LEARNING_POLICY.md
     ↓
 どのような考え方で開発しながら学習するか
 ```
@@ -937,11 +937,11 @@ APIを設計する
 
 一方で、効率を優先するあまり、技術選定の理由や基礎となる仕組みの理解を省略しないでください。
 
-`docs/ROADMAP.md` に従って開発の現在地を管理し、
+`learning/ROADMAP.md` に従って開発の現在地を管理し、
 
-`docs/TEACHING_RULES.md` に従って講義・説明を行い、
+`learning/TEACHING_RULES.md` に従って講義・説明を行い、
 
-本ファイル `docs/DEVELOPMENT_LEARNING_POLICY.md` に従って、
+本ファイル `learning/DEVELOPMENT_LEARNING_POLICY.md` に従って、
 
 **「実際のアプリ開発の流れそのものを、実務的な判断とともに学ぶ」**
 

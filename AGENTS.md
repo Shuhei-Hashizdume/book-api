@@ -21,16 +21,16 @@
 このプロジェクトでは、以下の5つの文書を使用します。
 
 ```text
-docs/ROADMAP.md
-docs/TEACHING_RULES.md
-docs/DEVELOPMENT_LEARNING_POLICY.md
-docs/progress/CURRENT.md
-docs/progress/HISTORY.md
+learning/ROADMAP.md
+learning/TEACHING_RULES.md
+learning/DEVELOPMENT_LEARNING_POLICY.md
+learning/progress/CURRENT.md
+learning/progress/HISTORY.md
 ```
 
 それぞれの役割は以下です。
 
-## `docs/ROADMAP.md`
+## `learning/ROADMAP.md`
 
 **何を、どの順番で開発・学習するか**
 
@@ -38,7 +38,7 @@ docs/progress/HISTORY.md
 
 Phase / Step、機能実装順、開発全体の流れを確認するときに使用してください。
 
-## `docs/TEACHING_RULES.md`
+## `learning/TEACHING_RULES.md`
 
 **Codexがどのように説明・指導するか**
 
@@ -46,7 +46,7 @@ Phase / Step、機能実装順、開発全体の流れを確認するときに�
 
 講義、コード説明、理解確認、ヒント、デバッグ支援などを行う場合は、このルールに従ってください。
 
-## `docs/DEVELOPMENT_LEARNING_POLICY.md`
+## `learning/DEVELOPMENT_LEARNING_POLICY.md`
 
 **このプロジェクトをどのような考え方で開発しながら学習するか**
 
@@ -63,7 +63,7 @@ Phase / Step、機能実装順、開発全体の流れを確認するときに�
 
 という方針を判断基準として使用してください。
 
-## `docs/progress/CURRENT.md`
+## `learning/progress/CURRENT.md`
 
 **現在の開発・学習位置**
 
@@ -79,7 +79,7 @@ Phase / Step、機能実装順、開発全体の流れを確認するときに�
 - 再開地点
 - 未解決事項
 
-## `docs/progress/HISTORY.md`
+## `learning/progress/HISTORY.md`
 
 **過去の重要な開発・学習履歴**
 
@@ -107,18 +107,18 @@ Phase / Step、機能実装順、開発全体の流れを確認するときに�
 ```text
 AGENTS.md
     ↓
-docs/progress/CURRENT.md
+learning/progress/CURRENT.md
     ↓
 現在のPhase / Stepを確認
     ↓
-docs/ROADMAP.md の該当箇所を確認
+learning/ROADMAP.md の該当箇所を確認
     ↓
-docs/TEACHING_RULES.md
+learning/TEACHING_RULES.md
     ↓
-docs/DEVELOPMENT_LEARNING_POLICY.md
+learning/DEVELOPMENT_LEARNING_POLICY.md
 ```
 
-必要な場合は `docs/progress/HISTORY.md` も確認してください。
+必要な場合は `learning/progress/HISTORY.md` も確認してください。
 
 ただし、毎回HISTORY全体を最初から読み直す必要はありません。
 
@@ -144,7 +144,7 @@ docs/DEVELOPMENT_LEARNING_POLICY.md
 まず、
 
 ```text
-docs/progress/CURRENT.md
+learning/progress/CURRENT.md
 ```
 
 を確認してください。
@@ -180,7 +180,7 @@ docs/progress/CURRENT.md
 開発中は、
 
 ```text
-docs/ROADMAP.md
+learning/ROADMAP.md
 ```
 
 を基準として現在のPhase / Stepを意識してください。
@@ -188,7 +188,7 @@ docs/ROADMAP.md
 講義・説明については、
 
 ```text
-docs/TEACHING_RULES.md
+learning/TEACHING_RULES.md
 ```
 
 に従ってください。
@@ -196,7 +196,7 @@ docs/TEACHING_RULES.md
 技術選定や開発順序の判断については、
 
 ```text
-docs/DEVELOPMENT_LEARNING_POLICY.md
+learning/DEVELOPMENT_LEARNING_POLICY.md
 ```
 
 に従ってください。
@@ -341,7 +341,7 @@ PostgreSQL
 
 # 8. ROADMAPを機械的に実行しない
 
-`docs/ROADMAP.md` は重要な基準ですが、絶対に変更できない手順書ではありません。
+`learning/ROADMAP.md` は重要な基準ですが、絶対に変更できない手順書ではありません。
 
 開発中に、
 
@@ -404,7 +404,7 @@ Codexはその回答をレビューし、必要な修正・ヒントを提示し
 
 エラーが発生しても、Codexが即座に修正して終了しないでください。
 
-`docs/TEACHING_RULES.md` のデバッグ方針に従います。
+`learning/TEACHING_RULES.md` のデバッグ方針に従います。
 
 基本的には、
 
@@ -439,7 +439,7 @@ Codexはその回答をレビューし、必要な修正・ヒントを提示し
 以下のようなタイミングでは、
 
 ```text
-docs/progress/CURRENT.md
+learning/progress/CURRENT.md
 ```
 
 を最新状態へ更新してください。
@@ -467,7 +467,7 @@ CURRENT.mdは履歴ファイルではありません。
 以下のような重要な出来事があった場合は、
 
 ```text
-docs/progress/HISTORY.md
+learning/progress/HISTORY.md
 ```
 
 への追記を検討してください。
@@ -507,7 +507,7 @@ docs/progress/HISTORY.md
 最低限、
 
 ```text
-docs/progress/CURRENT.md
+learning/progress/CURRENT.md
 ```
 
 について、
@@ -523,7 +523,7 @@ docs/progress/CURRENT.md
 重要な学習・設計判断・問題解決があった場合は、
 
 ```text
-docs/progress/HISTORY.md
+learning/progress/HISTORY.md
 ```
 
 にも記録してください。
@@ -605,11 +605,11 @@ Codexがファイルを変更した場合は、受講者が変更内容を理解
 
 ```text
 AGENTS.md
-docs/ROADMAP.md
-docs/TEACHING_RULES.md
-docs/DEVELOPMENT_LEARNING_POLICY.md
-docs/progress/CURRENT.md
-docs/progress/HISTORY.md
+learning/ROADMAP.md
+learning/TEACHING_RULES.md
+learning/DEVELOPMENT_LEARNING_POLICY.md
+learning/progress/CURRENT.md
+learning/progress/HISTORY.md
 ```
 
 Codexだけで勝手に重要方針を変更しないでください。

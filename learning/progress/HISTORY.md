@@ -27,7 +27,7 @@
 
 # CURRENT.mdとの役割の違い
 
-`docs/progress/CURRENT.md`
+`learning/progress/CURRENT.md`
 
 ```text
 現在地を管理する
@@ -38,7 +38,7 @@
 どこから再開する？
 ```
 
-`docs/progress/HISTORY.md`
+`learning/progress/HISTORY.md`
 
 ```text
 過去を記録する
@@ -280,11 +280,11 @@ HISTORY.mdが巨大な作業ログになることを避けてください。
 以下の管理文書を作成した。
 
 ```text
-docs/ROADMAP.md
-docs/TEACHING_RULES.md
-docs/DEVELOPMENT_LEARNING_POLICY.md
-docs/progress/CURRENT.md
-docs/progress/HISTORY.md
+learning/ROADMAP.md
+learning/TEACHING_RULES.md
+learning/DEVELOPMENT_LEARNING_POLICY.md
+learning/progress/CURRENT.md
+learning/progress/HISTORY.md
 ```
 
 また、Codexへの常設指示を記述するため、
@@ -384,7 +384,7 @@ Codexが追記してください。
 が追えるように、新しい履歴として追加してください。
 
 現在の状態については、
-`docs/progress/CURRENT.md` を最新状態へ更新してください。
+`learning/progress/CURRENT.md` を最新状態へ更新してください。
 
 ---
 
@@ -2286,3 +2286,40 @@ Statementの設計図を作り、`db.execute()` で初めてDBへ問い合わせ
 
 Phase 11 / Feature 14で、現在のBook・ジャンル・平均おすすめ度を使った
 単純な関連書籍レコメンドを設計する。
+
+### Phase 11 / Feature 14：表紙画像URL対応
+
+#### 設計判断
+
+関連書籍、書籍詳細、検索結果、読了投稿、本棚で表紙を表示するため、
+画像ファイル自体ではなくGoogle Booksが返す画像URLをBookへ保存する。
+URLは長さの明確な業務上限がないため `Text`、画像がない本も扱うため
+NULL許可の `cover_image_url` とした。
+
+保存するURLは `small`、`thumbnail`、`smallThumbnail` の順に選び、
+すべてない場合はNULLとする。1つの比較的大きな画像を保存し、
+一覧表示ではフロントエンドのCSSで縮小する方針を採用した。
+
+#### 実施内容
+
+BookモデルとMigration `5a7df84bc82c` に `cover_image_url` を追加し、
+開発用・テスト用DBへ適用した。Google Booksの検索結果を解析して
+画像URLを選び、新規Bookへ保存する処理を追加した。
+
+同じISBNの既存Bookでは、画像URLがNULLの場合だけGoogle Booksの値で
+補完し、すでにURLがある場合は上書きしない。
+
+`BookResponse`、`BookSearchResult`、`TimelinePostResponse`、
+`PublicBookshelfBookResponse`へ画像URLを追加し、検索結果、書籍詳細、
+マイ本棚、おすすめ・フォロー中タイムライン、公開本棚で返せるようにした。
+
+#### 動作確認
+
+Google Booksの3サイズの優先順位と画像なし、Bookへの新規保存・補完・
+既存URLの保護、書籍詳細、マイ本棚、2種類のタイムライン、公開本棚を確認した。
+既存機能を含む全198件のテストが成功した。
+
+#### 次につながること
+
+保存した表紙画像URLを利用し、未ログインでも取得できる関連書籍APIの
+関連条件、並び順、最大件数、レスポンス項目を設計する。
