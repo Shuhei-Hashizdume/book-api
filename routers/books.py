@@ -14,9 +14,11 @@ from schemas.books import (
     BookResponse,
     BookSearchResult,
     BookUpdate,
+    RelatedBookResponse,
 )
 from services.book_detail import get_book_with_average_score
 from services.google_books import search_google_books
+from services.related_books import get_related_books
 
 router = APIRouter(
     prefix="/books",
@@ -123,3 +125,16 @@ def delete_book(book_id: int, db: SessionDep, admin_user: AdminUserDep):
         )
     db.delete(target_book)
     db.commit()
+
+
+@router.get("/{book_id}/related", response_model=list[RelatedBookResponse])
+def read_related_books(book_id: Annotated[int, Path(gt=0)], db: SessionDep):
+    related_books = get_related_books(book_id, db)
+
+    if related_books is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="本が見つかりません。",
+        )
+
+    return related_books
