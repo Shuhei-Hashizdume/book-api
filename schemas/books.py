@@ -53,3 +53,10 @@ class BookSearchResult(BaseModel):
 class BookDetailResponse(BookResponse):
     genre: BookGenre
     average_recommendation_score: float | None
+
+
+class RelatedBookResponse(BaseModel):
+    book_id: int
+    title: str
+    cover_image_url: str | None
+    average_recommendation_score: float | None
