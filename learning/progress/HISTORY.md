@@ -2372,3 +2372,67 @@ ServiceではBookごとに `group_by(Book.id)` し、UserBookのおすすめ度�
 
 Phase 11 / Feature 15で、読書中の本を一定期間更新していないユーザーへの
 読書リマインド要件を整理する。
+
+### Phase 11 / Feature 15：読書リマインド要件
+
+#### 確定事項
+
+- ログイン中のユーザーが、自分の読書中のUserBookへ明示的に設定する
+- 設定日の7日後の20時に、登録メールアドレスへ1回だけ送信する
+- 送信前に読書中以外へ変わった場合は、メールを送信せず終了する
+- 手動解除とメール内の解除リンクは実装しない
+- 送信に失敗しても再試行せず、失敗状態で終了する
+- 終了後も読書中の場合は再設定でき、既存のReadingReminderを再利用する
+- メール送信にはResendを使用する
+- 配信結果を受信するWebhookは実装しない
+- 送信対象は5分ごとに実行するコマンドで確認する
+- 状態は `ACTIVE`、`SEND_ACCEPTED`、`READING_STATUS_CHANGED`、
+  `SEND_FAILED` の4種類とする
+
+#### 次に行うこと
+
+`enums.py`へ追加する読書リマインド状態Enumを設計する。
+
+### Phase 11 / Feature 15：読書リマインド実装完了
+
+#### 設計判断
+
+ReadingReminderはUserBookと1対1で紐づけ、設定日時、
+次回送信予定時刻、処理状態を保存する。
+送信時はReadingReminder、UserBook、User、Bookを1回の問い合わせで結合し、
+リマインダー、読書状態、宛先、書籍名をまとめて取得する。
+
+Resendへの重複送信を防ぐため、ReadingReminder IDと
+`next_send_at` を組み合わせた冪等性キーを使用する。
+Resendが送信要求を受け付けた場合は `SEND_ACCEPTED`、
+送信処理で例外が発生した場合は `SEND_FAILED`、
+読書中以外に変わっていた場合は `READING_STATUS_CHANGED` とする。
+
+定期処理はFastAPIのHTTPリクエスト内で実行せず、
+`commands/send_reading_reminders.py` を1回実行するごとに
+現在の送信対象を処理する。ローカルで定期起動は設定せず、
+本番配置時に外部スケジューラーから5分ごとに呼び出す。
+
+#### 実施内容
+
+`ReadingReminderStatus`、`ReadingReminder`、Migration `c9107ce826ea`、
+設定・状態取得API、送信対象取得Service、Resendメール送信Service、
+1件ごとと複数件の処理Service、定期実行用コマンドを追加した。
+
+GitHub ActionsにはResendの実キーを渡さず、
+Settings読み込み用のダミー値を設定した。
+
+#### 動作確認
+
+送信対象の抽出、対象外の除外、読書状態変更時の終了、
+Resend受付・失敗時の状態更新、冪等性キー、複数件処理、
+コマンドの時刻とDBセッションの受け渡しをテストした。
+既存機能を含む全235件が成功した。
+
+開発用DBで送信対象を1件に限定し、コマンドを1回実行した。
+実メールの受信、状態の `SEND_ACCEPTED` への更新、
+次回の送信対象が0件になることを確認した。
+
+#### 次に行うこと
+
+Feature 15の変更差分をレビューし、Gitへの記録準備を行う。

@@ -39,7 +39,26 @@ Feature 14：関連書籍レコメンドが完了。
 関連書籍テスト8件と、既存機能を含む全206件のテストが
 成功しています。
 
-次はFeature 15：読書リマインドの要求を整理します。
+現在はFeature 15：読書リマインドが完了しています。
+
+`ReadingReminder` Model、Migration、レスポンスSchema、Service、
+`POST /users/me/books/{book_id}/reminder` を実装しました。
+新規設定、終了済みリマインダーの再設定、未登録、対象外の読書状態、
+重複設定、未認証、不正なBook ID、DB競合を検証する11ケースを追加しました。
+
+さらに `GET /users/me/books/{book_id}/reminder` を実装し、
+正常取得、UserBook未登録、ReadingReminder未設定、
+不正なBook ID、未認証を検証する7ケースを追加しました。
+送信対象の取得、1件ごとの状態確認とメール送信、
+Resendの冪等性キー、定期実行用コマンドを実装しました。
+`commands/send_reading_reminders.py` の `main()` が、日本時間と
+DBセッションをサービス処理へ渡すテストも追加しています。
+既存機能を含む全235件のテストが成功しています。
+
+開発用DBの対象を1件に限定し、実メールを受信し、
+`ReadingReminder.status` が `SEND_ACCEPTED` へ更新されることも確認しました。
+
+次はFeature 15の変更差分を整理し、Gitへの記録準備を行います。
 
 ---
 
@@ -312,16 +331,51 @@ Phase 11 / Feature 13で、全ユーザーの公開投稿を取得する
 
 # 現在行っていること
 
-Phase 11 / Feature 14の前提として、Google Booksの表紙画像URLの
-取得・保存と、既存の書籍表示APIへの追加が完了しました。
-現在は、関連書籍レコメンド自体の設計へ進むところです。
+Phase 11 / Feature 15：読書リマインドが完了しました。
+
+ログイン中のユーザーが、読書中のUserBookへ明示的に設定します。
+設定日の7日後の20時に、登録メールアドレスへ1回だけ送信します。
+送信前に読書中以外へ変わった場合は、送信せず終了します。
+
+メール送信にはResendを使用します。Webhook、手動解除、
+メール内の解除リンク、送信の再試行は実装しません。
+
+`ReadingReminderStatus`、`ReadingReminder`モデル、
+マイグレーション `c9107ce826ea` を作成しました。
+開発用・テスト用DBへ適用済みです。
+
+`ReadingReminderResponse` を設定APIと状態取得APIで共有し、
+`POST /users/me/books/{book_id}/reminder` と
+`GET /users/me/books/{book_id}/reminder` の実装・テストが完了しました。
+
+送信対象となる `ReadingReminder`、`UserBook.status`、
+`User.email`、`Book.title` をDBからまとめて取得し、
+1件ごとに読書状態の確認、Resendへの送信要求、
+リマインダー状態の更新を行うサービス処理を実装しました。
+
+`commands/send_reading_reminders.py` を追加し、日本時間の現在時刻と
+DBセッションを準備してサービス処理を1回呼び出せる状態です。
+コマンド用テストを含む全235件のテストが成功しています。
+
+GitHub Actionsに `RESEND_API_KEY` と `RESEND_FROM_EMAIL` の
+テスト用ダミー値を追加しました。
+`.env` がない状態でも、CI用環境変数だけで
+`Settings` を作成できることを確認済みです。
+
+開発用DBで、自分が受信確認できる1件だけを
+送信対象にし、コマンドを1回実行しました。
+実メールを受信し、対象の状態が `SEND_ACCEPTED` へ更新され、
+次回の送信対象が0件になることを確認しました。
+
+ローカルで5分ごとの自動起動は設定せず、
+本番配置時に外部のスケジューラーからコマンドを呼び出す方針です。
 
 ---
 
 # 次に行うこと
 
-現在のBook・代表ジャンル・平均おすすめ度で実現できる
-単純な関連書籍レコメンドの取得条件とAPIレスポンスを設計します。
+Feature 15で変更したファイルと設計内容を整理し、
+Gitへの記録前の差分レビューを行います。
 
 ---
 
@@ -329,14 +383,14 @@ Phase 11 / Feature 14の前提として、Google Booksの表紙画像URLの
 
 次回このプロジェクトを再開する場合は、
 
-**Phase 11 / Feature 14：関連書籍レコメンドの要件を整理する**
+**Phase 11 / Feature 15：完了した変更差分を確認する**
 
 から再開してください。
 
 現在の具体的な次の作業は、
 
-**どの情報を使ってBook同士を関連付け、
-どの順番で提示するかを整理すること**
+**`git diff` と `git status` でFeature 15の変更範囲を確認し、
+コミット可能な状態かレビューすること**
 
 です。
 

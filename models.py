@@ -15,7 +15,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
-from enums import BookGenre, ReadingPriority, ReadingStatus
+from enums import BookGenre, ReadingPriority, ReadingReminderStatus, ReadingStatus
 
 
 class Book(Base):
@@ -88,6 +88,9 @@ class UserBook(Base):
     recommendation_score: Mapped[int | None] = mapped_column(nullable=True)
     reading_post: Mapped["ReadingPost | None"] = relationship(
         back_populates="user_book"
+    )
+    reading_reminder: Mapped["ReadingReminder | None"] = relationship(
+        back_populates="user_book", cascade="all, delete-orphan", passive_deletes=True
     )
     __table_args__ = (
         UniqueConstraint(
@@ -198,4 +201,27 @@ class Follow(Base):
         CheckConstraint(
             "follower_id != followed_id", name="ck_follows_different_users"
         ),
+    )
+
+
+class ReadingReminder(Base):
+    __tablename__ = "reading_reminders"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_book_id: Mapped[int] = mapped_column(
+        ForeignKey("user_books.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[ReadingReminderStatus] = mapped_column(
+        Enum(ReadingReminderStatus, name="reading_reminder_status"),
+        nullable=False,
+        default=ReadingReminderStatus.ACTIVE,
+    )
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    next_send_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    user_book: Mapped[UserBook] = relationship(back_populates="reading_reminder")
+    __table_args__ = (
+        UniqueConstraint("user_book_id", name="uq_reading_reminders_user_book_id"),
     )

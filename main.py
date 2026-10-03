@@ -6,6 +6,7 @@ from routers.insights import router as insight_router
 from routers.likes import router as likes_router
 from routers.profiles import router as profiles_router
 from routers.reading_posts import router as reading_posts_router
+from routers.reading_reminders import router as reminders_router
 from routers.timelines import router as timelines_router
 from routers.user_books import router as user_books_router
 from routers.users import router as users_router
@@ -20,3 +21,4 @@ app.include_router(likes_router)
 app.include_router(follow_router)
 app.include_router(profiles_router)
 app.include_router(timelines_router)
+app.include_router(reminders_router)

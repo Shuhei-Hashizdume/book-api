@@ -24,6 +24,8 @@ jobs:
       JWT_SECRET_KEY: ci_only_test_secret_key
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
       GOOGLE_BOOKS_API_KEY: ci_only_test_api_key
+      RESEND_API_KEY: ci_only_test_resend_api_key
+      RESEND_FROM_EMAIL: "Book API <test@example.com>"
 
     services:
       postgres:
