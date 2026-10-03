@@ -22,3 +22,10 @@ class BookGenre(StrEnum):
     HUMANITIES = "humanities"
     SCIENCE = "science"
     OTHER = "other"
+
+
+class ReadingReminderStatus(StrEnum):
+    ACTIVE = "active"
+    SEND_ACCEPTED = "send_accepted"
+    READING_STATUS_CHANGED = "reading_status_changed"
+    SEND_FAILED = "send_failed"
