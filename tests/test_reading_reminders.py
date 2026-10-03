@@ -48,7 +48,9 @@ def test_set_user_book_reading_reminder(
     assert reading_reminder.status == ReadingReminderStatus.ACTIVE
     assert reading_reminder.user_book_id == user_book.id
     assert reading_reminder.started_at is not None
-    assert reading_reminder.next_send_at.isoformat() == response_data["next_send_at"]
+    assert reading_reminder.next_send_at == datetime.fromisoformat(
+        response_data["next_send_at"]
+    )
 
     jst = ZoneInfo("Asia/Tokyo")
 
@@ -114,7 +116,9 @@ def test_reset_user_book_reading_reminder(
     assert reading_reminder.status == ReadingReminderStatus.ACTIVE
     assert reading_reminder.user_book_id == user_book.id
     assert reading_reminder.started_at is not None
-    assert reading_reminder.next_send_at.isoformat() == response_data["next_send_at"]
+    assert reading_reminder.next_send_at == datetime.fromisoformat(
+        response_data["next_send_at"]
+    )
 
     jst = ZoneInfo("Asia/Tokyo")
 
@@ -321,7 +325,9 @@ def test_get_user_book_reading_reminder_status(
     assert response_data["id"] == reading_reminder.id
     assert response_data["user_book_id"] == reading_reminder.user_book_id
     assert response_data["status"] == reading_reminder.status
-    assert response_data["next_send_at"] == reading_reminder.next_send_at.isoformat()
+    assert reading_reminder.next_send_at == datetime.fromisoformat(
+        response_data["next_send_at"]
+    )
 
 
 def test_get_user_book_reading_reminder_status_returns_user_book_not_found_error(
