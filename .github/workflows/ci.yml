@@ -26,6 +26,8 @@ jobs:
       GOOGLE_BOOKS_API_KEY: ci_only_test_api_key
       RESEND_API_KEY: ci_only_test_resend_api_key
       RESEND_FROM_EMAIL: "Book API <test@example.com>"
+      OPENAI_API_KEY: ci_only_test_openai_api_key
+      OPENAI_MODEL: gpt-6-luna
 
     services:
       postgres:

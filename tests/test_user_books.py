@@ -824,12 +824,11 @@ def test_create_user_book_from_search_returns_conflict_for_duplicate(
         "external_id": "duplicate-book-id",
         "priority": "high",
     }
-    authorization_header = {"Authorization": f"Bearer {access_token}"}
 
     first_response = client.post(
         "/users/me/books/from-search",
         json=request_data,
-        headers=authorization_header,
+        headers={"Authorization": f"Bearer {access_token}"},
     )
 
     assert first_response.status_code == 201
@@ -838,7 +837,7 @@ def test_create_user_book_from_search_returns_conflict_for_duplicate(
     second_response = client.post(
         "/users/me/books/from-search",
         json=request_data,
-        headers=authorization_header,
+        headers={"Authorization": f"Bearer {access_token}"},
     )
 
     assert second_response.status_code == 409

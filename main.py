@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from routers.ai_suggestions import router as ai_suggestion_router
 from routers.books import router as books_router
 from routers.follows import router as follow_router
 from routers.insights import router as insight_router
@@ -22,3 +23,4 @@ app.include_router(follow_router)
 app.include_router(profiles_router)
 app.include_router(timelines_router)
 app.include_router(reminders_router)
+app.include_router(ai_suggestion_router)
