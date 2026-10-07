@@ -58,7 +58,11 @@ DBセッションをサービス処理へ渡すテストも追加しています
 開発用DBの対象を1件に限定し、実メールを受信し、
 `ReadingReminder.status` が `SEND_ACCEPTED` へ更新されることも確認しました。
 
-次はFeature 15の変更差分を整理し、Gitへの記録準備を行います。
+Feature 15の変更はPR #17で `main` ブランチへマージ済みです。
+Feature 16：AI転用提案の生成・保存POSTとローカル検証が完了しました。
+本人のInsightに対し、OpenAIで生成した4項目を保存し、再生成時は上書きします。
+取得GET・提案単体の削除DELETEも実装し、全269テストが成功しました。
+CI用ダミー環境変数だけでSettingsを読み込めることは確認済みです。設計の振り返りと最終レビューも完了し、次はGitへの記録準備です。GitHub Actions上の実行は未確認です。
 
 ---
 
@@ -331,6 +335,9 @@ Phase 11 / Feature 13で、全ユーザーの公開投稿を取得する
 
 # 現在行っていること
 
+受講者の希望により、途中の進捗はCURRENT.mdで管理し、HISTORY.mdは機能実装完了時に従来の分量でまとめます。
+Feature 16の途中経過を細かく分けたHISTORY.mdの追記は削除しました。現在の判断・確認結果は本ファイルに残しています。
+
 Phase 11 / Feature 15：読書リマインドが完了しました。
 
 ログイン中のユーザーが、読書中のUserBookへ明示的に設定します。
@@ -370,29 +377,51 @@ GitHub Actionsに `RESEND_API_KEY` と `RESEND_FROM_EMAIL` の
 ローカルで5分ごとの自動起動は設定せず、
 本番配置時に外部のスケジューラーからコマンドを呼び出す方針です。
 
+Feature 15の変更はPR #17で `main` ブランチへマージ済みです。
+Feature 16：AI転用提案の生成・保存POSTとローカル検証が完了しました。
+
+- AISuggestion Model、Migration 07fb83edbd05、入力・出力Schema、Service、Routerを追加しました。
+- Insightと0対1で紐づけ、insight_idのUNIQUEとON DELETE CASCADEを設定しています。
+- POST /users/me/books/{book_id}/insights/{insight_id}/ai_suggestionは新規201、再生成200です。
+- 気づき未登録・他人の気づきは404、生成失敗・保存失敗は500として返します。
+- OpenAI公式Python SDK 3.24.0とgpt-6-lunaを採用し、4項目を構造化出力で受け取ります。
+- instructionsは読者に役立つ内容に集中し、AI側の生成方針や情報不足の断り書きを出しません。
+- 同じ入力で推論設定あり・省略の実生成を比較し、受講者がreasoningとmax_output_tokensの明示指定を両方省略する方針を選びました。
+- APIError変換、解析済み結果なし、成功時の返却を通信クライアントのMockで検証しました。
+- commitのIntegrityErrorはrollback後AISuggestionSaveErrorへ変換し、rollback呼び出し・DB未保存をテストしています。制約別の原因判別はしていません。
+- AI提案の34ケースを含む全269テストが成功しました。Codexによるテスト追加は受講者の明示依頼に基づいて行いました。
+- CIへOPENAI_API_KEYのダミー値とOPENAI_MODELを追加し、.envを無効にしてCI環境変数だけでSettingsを読み込めることを確認しました。
+- 読書リマインドのPOSTも既定201・更新時200へ書き方を統一しました。
+
+実キーは.envに保存され、Git管理対象外です。自動テストではOpenAIへの実通信を置き換えています。
+GET・DELETEを追加し、2026-10-07に全269テストが成功しました。GETは200、DELETEは本文なし204、対象なしは404です。
+AISuggestion → Insight → UserBookをJOINし、気づきID・本ID・本人IDで絞ります。DELETEは取得Serviceを再利用します。
+GET・DELETEとも正常系、提案未登録404、未認証401、不正ID422、他人の提案404、本ID不一致404を検証済みです。削除を拒否した場合に提案が残ることも確認しました。
+再生成失敗時に既存提案のID・4項目・件数が維持されることも検証しました。
+所有者確認・UNIQUE制約・再生成失敗時の保持を振り返り、変更差分を確認しました。Feature 16のローカル実装・検証は完了です。
+GitHub Actions上の実行、コミットはこれからです。
+
+フォルダ移動前の絶対パスが仮想環境に残っていたため、現在の場所で`.venv`を再作成し、
+両requirementsファイルからライブラリを導入しました。
+依存関係、Alembic・pytestの起動、モデルの読み込みは確認済みです。
+旧環境は`.venv-backup-20261004`に残しています。
+AI回答方針のローカル参考資料は`local-notes/feature-16-ai-suggestion-policy.md`です。
+
 ---
 
 # 次に行うこと
 
-Feature 15で変更したファイルと設計内容を整理し、
-Gitへの記録前の差分レビューを行います。
+Phase 11 / Feature 16：ローカル実装・検証を完了しました。次はGitへの記録準備です。
+GitHub Actions上でのテスト実行、コミットは未実施です。HISTORYへ完了内容を簡潔に追記しました。
 
 ---
 
 # 再開地点
 
-次回このプロジェクトを再開する場合は、
+**Phase 11 / Feature 16：Gitへの記録準備**
 
-**Phase 11 / Feature 15：完了した変更差分を確認する**
-
-から再開してください。
-
-現在の具体的な次の作業は、
-
-**`git diff` と `git status` でFeature 15の変更範囲を確認し、
-コミット可能な状態かレビューすること**
-
-です。
+GET・DELETEの実装と正常系・異常系テストが揃い、全269テストが成功しています。
+設計の振り返りと差分確認も完了しています。次はGitへの記録準備です。
 
 ---
 

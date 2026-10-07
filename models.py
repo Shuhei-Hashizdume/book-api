@@ -117,6 +117,9 @@ class Insight(Base):
     )
     content: Mapped[str] = mapped_column(Text, nullable=False)
     user_book: Mapped[UserBook] = relationship(back_populates="insights")
+    ai_suggestion: Mapped["AISuggestion | None"] = relationship(
+        cascade="all,delete-orphan", passive_deletes=True, back_populates="insight"
+    )
 
 
 class ReadingPost(Base):
@@ -224,4 +227,20 @@ class ReadingReminder(Base):
     user_book: Mapped[UserBook] = relationship(back_populates="reading_reminder")
     __table_args__ = (
         UniqueConstraint("user_book_id", name="uq_reading_reminders_user_book_id"),
+    )
+
+
+class AISuggestion(Base):
+    __tablename__ = "ai_suggestions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    insight_id: Mapped[int] = mapped_column(
+        ForeignKey("insights.id", ondelete="CASCADE"), nullable=False
+    )
+    clarified_insight: Mapped[str] = mapped_column(Text, nullable=False)
+    deep_dive: Mapped[str] = mapped_column(Text, nullable=False)
+    practical_application: Mapped[str] = mapped_column(Text, nullable=False)
+    next_action: Mapped[str] = mapped_column(Text, nullable=False)
+    insight: Mapped[Insight] = relationship(back_populates="ai_suggestion")
+    __table_args__ = (
+        UniqueConstraint("insight_id", name="uq_ai_suggestion_insight_id"),
     )

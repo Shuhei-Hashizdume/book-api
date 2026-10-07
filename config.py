@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     google_books_api_key: str
     resend_api_key: str
     resend_from_email: str
+    openai_api_key: str
+    openai_model: str
 
     model_config = SettingsConfigDict(
         env_file=".env",
