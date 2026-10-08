@@ -45,7 +45,7 @@ class BookSearchResult(BaseModel):
     external_id: str
     title: str
     author: str
-    isbn: str
+    isbn: str | None
     genre: BookGenre
     cover_image_url: str | None
 

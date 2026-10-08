@@ -172,7 +172,7 @@ def test_search_books_returns_502_when_google_connection_fails(monkeypatch):
 def test_search_google_books_formats_results(monkeypatch):
     def fake_get(url, params, headers, timeout):
         assert url == google_books.GOOGLE_BOOKS_API_URL
-        assert params == {"q": "GANTZ"}
+        assert params == {"q": "GANTZ", "maxResults": 40}
         assert "x-goog-api-key" in headers
         assert timeout == 10.0
 
@@ -382,6 +382,14 @@ def test_search_google_books_excludes_incomplete_results(monkeypatch):
 
     assert results == [
         BookSearchResult(
+            external_id="no-isbn-13",
+            title="ISBN13なし",
+            author="著者",
+            isbn=None,
+            genre=BookGenre.OTHER,
+            cover_image_url=None,
+        ),
+        BookSearchResult(
             external_id="complete-book",
             title="正常な本",
             author="著者",
@@ -498,3 +506,35 @@ def test_convert_google_category_to_genre(
     result = google_books._convert_google_category_to_genre(main_category)
 
     assert result == expected_genre
+
+
+@pytest.mark.parametrize(
+    "identifiers", [[], [{"type": "ISBN_10", "identifier": "0000000004"}]]
+)
+def test_get_google_book_returns_book_without_isbn_13(monkeypatch, identifiers):
+    def fake_get(url, headers, timeout):
+        assert url == f"{google_books.GOOGLE_BOOKS_API_URL}/no-isbn-book"
+        return httpx2.Response(
+            status_code=200,
+            request=httpx2.Request("GET", url),
+            json={
+                "id": "no-isbn-book",
+                "volumeInfo": {
+                    "title": "ISBNなしの本",
+                    "authors": ["テスト著者"],
+                    "industryIdentifiers": identifiers,
+                },
+            },
+        )
+
+    monkeypatch.setattr(google_books.httpx2, "get", fake_get)
+
+    result = google_books.get_google_book("no-isbn-book")
+    assert result == BookSearchResult(
+        external_id="no-isbn-book",
+        title="ISBNなしの本",
+        author="テスト著者",
+        isbn=None,
+        genre=BookGenre.OTHER,
+        cover_image_url=None,
+    )

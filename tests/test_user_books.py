@@ -531,11 +531,14 @@ def test_update_user_book_recommendation_score_unauthorized(book_in_db):
     assert patch_response.status_code == 401
 
 
+@pytest.mark.parametrize("isbn", ["9780000000011", None])
 def test_create_user_book_from_search_creates_book_and_user_book(
     monkeypatch,
     access_token,
     db_session,
     registered_user,
+    book_in_db,
+    isbn,
 ):
     def fake_get_google_book(external_id: str) -> BookSearchResult:
         assert external_id == "abc123"
@@ -544,7 +547,7 @@ def test_create_user_book_from_search_creates_book_and_user_book(
             external_id="abc123",
             title="検索結果の本",
             author="著者A / 著者B",
-            isbn="9780000000011",
+            isbn=isbn,
             genre=BookGenre.MANGA,
             cover_image_url="https://example.com/new-book-small.jpg",
         )
@@ -582,9 +585,11 @@ def test_create_user_book_from_search_creates_book_and_user_book(
     saved_book = db_session.get(Book, response_data["book_id"])
 
     assert saved_book is not None
+    assert saved_book.id != book_in_db.id
+    assert saved_book.external_id == "abc123"
     assert saved_book.title == "検索結果の本"
     assert saved_book.author == "著者A / 著者B"
-    assert saved_book.isbn == "9780000000011"
+    assert saved_book.isbn == isbn
     assert saved_book.genre == BookGenre.MANGA
     assert saved_book.cover_image_url == "https://example.com/new-book-small.jpg"
 
@@ -603,12 +608,17 @@ def test_create_user_book_from_search_creates_book_and_user_book(
     db_session.commit()
 
 
+@pytest.mark.parametrize(
+    "existing_external_id", [None, "existing-book-id", "saved-google-id"]
+)
 def test_create_user_book_from_search_reuses_existing_book(
     monkeypatch,
     access_token,
     db_session,
+    existing_external_id,
 ):
     existing_book = Book(
+        external_id=existing_external_id,
         title="DBに保存済みのタイトル",
         author="DBに保存済みの著者",
         isbn="9780000000012",
@@ -661,6 +671,9 @@ def test_create_user_book_from_search_reuses_existing_book(
     assert saved_user_book.book_id == existing_book_id
 
     db_session.refresh(existing_book)
+    assert existing_book.external_id == (
+        existing_external_id if existing_external_id is not None else "existing-book-id"
+    )
     assert existing_book.title == existing_title
     assert existing_book.author == existing_author
     assert existing_book.isbn == "9780000000012"
@@ -796,11 +809,13 @@ def test_create_user_book_from_search_preserves_existing_genre(
     db_session.commit()
 
 
+@pytest.mark.parametrize("isbn", ["9780000000013", None])
 def test_create_user_book_from_search_returns_conflict_for_duplicate(
     monkeypatch,
     access_token,
     db_session,
     registered_user,
+    isbn,
 ):
     def fake_get_google_book(external_id: str) -> BookSearchResult:
         assert external_id == "duplicate-book-id"
@@ -809,7 +824,7 @@ def test_create_user_book_from_search_returns_conflict_for_duplicate(
             external_id="duplicate-book-id",
             title="重複確認用の本",
             author="重複確認用の著者",
-            isbn="9780000000013",
+            isbn=isbn,
             genre=BookGenre.MANGA,
             cover_image_url=None,
         )
@@ -846,7 +861,7 @@ def test_create_user_book_from_search_returns_conflict_for_duplicate(
     }
 
     saved_books = db_session.scalars(
-        select(Book).where(Book.isbn == "9780000000013")
+        select(Book).where(Book.external_id == "duplicate-book-id")
     ).all()
     saved_user_books = db_session.scalars(
         select(UserBook).where(
@@ -856,6 +871,7 @@ def test_create_user_book_from_search_returns_conflict_for_duplicate(
     ).all()
 
     assert len(saved_books) == 1
+    assert saved_books[0].isbn == isbn
     assert len(saved_user_books) == 1
     assert saved_books[0].genre == BookGenre.MANGA
     assert saved_user_books[0].book_id == first_response_data["book_id"]
@@ -1176,3 +1192,58 @@ def test_delete_user_book_with_reading_post_returns_conflict(
     assert user_book is not None
     assert user_book.reading_post is not None
     assert user_book.reading_post.id == reading_post_response.json()["id"]
+
+
+@pytest.mark.parametrize("incoming_isbn", [None, "9780000000020"])
+def test_create_user_book_from_search_reuses_external_id_before_isbn(
+    monkeypatch,
+    access_token,
+    other_access_token,
+    book_in_db,
+    db_session,
+    incoming_isbn,
+):
+    existing_book = db_session.get(Book, book_in_db.id)
+    existing_book.external_id = "existing-no-isbn-book"
+    db_session.commit()
+    existing_book_id = book_in_db.id
+
+    def fake_get_google_book(external_id: str) -> BookSearchResult:
+        assert external_id == "existing-no-isbn-book"
+        return BookSearchResult(
+            external_id=external_id,
+            title="Google側のタイトル",
+            author="Google側の著者",
+            isbn=incoming_isbn,
+            genre=BookGenre.OTHER,
+            cover_image_url=None,
+        )
+
+    monkeypatch.setattr(user_books, "get_google_book", fake_get_google_book)
+
+    try:
+        first_response = client.post(
+            "/users/me/books/from-search",
+            json={"external_id": "existing-no-isbn-book", "priority": "high"},
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        second_response = client.post(
+            "/users/me/books/from-search",
+            json={"external_id": "existing-no-isbn-book", "priority": "medium"},
+            headers={"Authorization": f"Bearer {other_access_token}"},
+        )
+
+        assert first_response.status_code == 201
+        assert second_response.status_code == 201
+        assert first_response.json()["book_id"] == existing_book_id
+        assert second_response.json()["book_id"] == existing_book_id
+        assert first_response.json()["id"] != second_response.json()["id"]
+        assert db_session.scalars(
+            select(Book.id).where(Book.external_id == "existing-no-isbn-book")
+        ).all() == [existing_book_id]
+    finally:
+        for saved_user_book in db_session.scalars(
+            select(UserBook).where(UserBook.book_id == existing_book_id)
+        ).all():
+            db_session.delete(saved_user_book)
+        db_session.commit()

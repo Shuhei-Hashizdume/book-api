@@ -93,7 +93,7 @@ def _parse_google_book(item: dict) -> BookSearchResult | None:
         if industry_data.get("type") == "ISBN_13":
             isbn = industry_data.get("identifier")
             break
-    if not external_id or not title or not authors or not isbn:
+    if not external_id or not title or not authors:
         return None
     author = " / ".join(authors)
 
@@ -114,7 +114,7 @@ def search_google_books(
 
     response = httpx2.get(
         GOOGLE_BOOKS_API_URL,
-        params={"q": query},
+        params={"q": query, "maxResults": 40},
         headers={"x-goog-api-key": settings.google_books_api_key},
         timeout=10.0,
     )

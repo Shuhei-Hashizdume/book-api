@@ -251,12 +251,17 @@ def create_user_book_from_search(
             detail="選択した本には登録に必要な書籍情報がありません。",
         )
 
-    statement = select(Book).where(Book.isbn == google_book.isbn)
+    statement = select(Book).where(Book.external_id == google_book.external_id)
     book = db.scalar(statement)
+
+    if book is None and google_book.isbn is not None:
+        statement = select(Book).where(Book.isbn == google_book.isbn)
+        book = db.scalar(statement)
 
     try:
         if book is None:
             book = Book(
+                external_id=google_book.external_id,
                 title=google_book.title,
                 author=google_book.author,
                 isbn=google_book.isbn,
@@ -270,6 +275,8 @@ def create_user_book_from_search(
                 book.genre = google_book.genre
             if book.cover_image_url is None and google_book.cover_image_url is not None:
                 book.cover_image_url = google_book.cover_image_url
+            if book.external_id is None:
+                book.external_id = google_book.external_id
 
         user_book = UserBook(
             user_id=current_user.id,

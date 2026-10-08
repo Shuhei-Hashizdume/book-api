@@ -21,6 +21,7 @@ from enums import BookGenre, ReadingPriority, ReadingReminderStatus, ReadingStat
 class Book(Base):
     __tablename__ = "books"
     id: Mapped[int] = mapped_column(primary_key=True)
+    external_id: Mapped[str | None] = mapped_column(nullable=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     author: Mapped[str] = mapped_column(String(255), nullable=False)
     genre: Mapped[BookGenre] = mapped_column(
@@ -34,6 +35,12 @@ class Book(Base):
         nullable=True,
     )
     cover_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    __table_args__ = (
+        UniqueConstraint(
+            "external_id",
+            name="uq_books_external_id",
+        ),
+    )
 
 
 class User(Base):
