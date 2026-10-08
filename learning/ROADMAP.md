@@ -1067,6 +1067,9 @@ Google Booksの `volumeInfo.mainCategory` をそのまま保存せず、
 
 公開投稿の投稿者からプロフィールへ移動し、そのページでフォローできるようにします。
 
+本人限定のフォロー中・フォロワー一覧も取得できるようにします。
+`GET /users/me/following`と`GET /users/me/followers`で相手の`id`・`username`のリストを返し、0件の場合は200と空のリストを返します。
+
 
 ---
 
