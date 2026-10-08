@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from main import app
 from models import Follow, User
+from security import create_access_token
 
 client = TestClient(app)
 
@@ -266,9 +267,7 @@ def test_delete_followed_user_cascades_to_follow(
     assert db_session.get(User, follower_id) is not None
 
 
-def test_follow_relationships(
-    access_token, registered_user, other_user, db_session
-):
+def test_follow_relationships(access_token, registered_user, other_user, db_session):
     create_response = client.post(
         f"/users/{other_user.id}/follow",
         headers={"Authorization": f"Bearer {access_token}"},
@@ -368,3 +367,142 @@ def test_different_users_can_follow_same_user(
         registered_user.id,
         other_user.id,
     }
+
+
+def test_read_following_users(access_token, other_user, third_user):
+
+    first_following_user_response = client.post(
+        f"/users/{other_user.id}/follow",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    second_following_user_response = client.post(
+        f"/users/{third_user.id}/follow",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert first_following_user_response.status_code == 201
+    assert second_following_user_response.status_code == 201
+
+    response = client.get(
+        "/users/me/following", headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert response.status_code == 200
+    response_data = response.json()
+    assert len(response_data) == 2
+    assert {(item["id"], item["username"]) for item in response_data} == {
+        (other_user.id, other_user.username),
+        (third_user.id, third_user.username),
+    }
+
+
+def test_read_following_users_returns_empty_list(access_token):
+    response = client.get(
+        "/users/me/following", headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert response.status_code == 200
+    response_data = response.json()
+    assert len(response_data) == 0
+    assert response_data == []
+
+
+def test_read_following_users_returns_without_access_token_error():
+    response = client.get("/users/me/following")
+
+    assert response.status_code == 401
+
+
+def test_read_following_users_excludes_other_users_following(
+    access_token, registered_user, other_access_token, third_user
+):
+    create_own_follow_response = client.post(
+        f"/users/{third_user.id}/follow",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert create_own_follow_response.status_code == 201
+
+    create_other_follow_response = client.post(
+        f"/users/{registered_user.id}/follow",
+        headers={"Authorization": f"Bearer {other_access_token}"},
+    )
+    assert create_other_follow_response.status_code == 201
+
+    response = client.get(
+        "/users/me/following",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == [{"id": third_user.id, "username": third_user.username}]
+
+
+def test_read_follower_users(
+    access_token, other_access_token, other_user, third_user, registered_user
+):
+    third_access_token = create_access_token(third_user.id)
+
+    first_following_user_response = client.post(
+        f"/users/{registered_user.id}/follow",
+        headers={"Authorization": f"Bearer {other_access_token}"},
+    )
+    second_following_user_response = client.post(
+        f"/users/{registered_user.id}/follow",
+        headers={"Authorization": f"Bearer {third_access_token}"},
+    )
+
+    assert first_following_user_response.status_code == 201
+    assert second_following_user_response.status_code == 201
+
+    response = client.get(
+        "/users/me/followers",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+    response_data = response.json()
+    assert len(response_data) == 2
+    assert {(item["id"], item["username"]) for item in response_data} == {
+        (other_user.id, other_user.username),
+        (third_user.id, third_user.username),
+    }
+
+
+def test_read_follower_users_returns_without_access_token_error():
+    response = client.get("/users/me/followers")
+
+    assert response.status_code == 401
+
+
+def test_read_follower_users_excludes_other_users_followers(
+    access_token, registered_user, other_user, other_access_token, third_user
+):
+    create_own_follower_response = client.post(
+        f"/users/{registered_user.id}/follow",
+        headers={"Authorization": f"Bearer {other_access_token}"},
+    )
+    assert create_own_follower_response.status_code == 201
+
+    create_other_follower_response = client.post(
+        f"/users/{third_user.id}/follow",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert create_other_follower_response.status_code == 201
+
+    response = client.get(
+        "/users/me/followers",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {"id": other_user.id, "username": other_user.username}
+    ]
+
+
+def test_read_follower_users_returns_empty_list(access_token):
+    response = client.get(
+        "/users/me/followers",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []

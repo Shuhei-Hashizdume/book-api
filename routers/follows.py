@@ -4,7 +4,7 @@ from sqlalchemy.exc import IntegrityError
 
 from dependencies import CurrentUserDep, SessionDep
 from models import Follow, User
-from schemas.follows import FollowResponse
+from schemas.follows import FollowResponse, ShowFollowResponse
 
 router = APIRouter(prefix="/users", tags=["follows"])
 
@@ -81,3 +81,27 @@ def delete_follow(followed_user_id: int, current_user: CurrentUserDep, db: Sessi
 
     db.delete(existing_follow)
     db.commit()
+
+
+@router.get("/me/following", response_model=list[ShowFollowResponse])
+def read_following_users(current_user: CurrentUserDep, db: SessionDep):
+    statement = (
+        select(User)
+        .join(Follow, Follow.followed_id == User.id)
+        .where(Follow.follower_id == current_user.id)
+    )
+
+    following_users = db.scalars(statement).all()
+    return following_users
+
+
+@router.get("/me/followers", response_model=list[ShowFollowResponse])
+def read_follower_users(current_user: CurrentUserDep, db: SessionDep):
+    statement = (
+        select(User)
+        .join(Follow, Follow.follower_id == User.id)
+        .where(Follow.followed_id == current_user.id)
+    )
+
+    follower_users = db.scalars(statement).all()
+    return follower_users
