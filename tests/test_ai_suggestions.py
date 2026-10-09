@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from main import app
-from models import AISuggestion, Book, UserBook
+from models import AISuggestion, Book, Insight, UserBook
 from schemas.ai_suggestion import AISuggestionOutput
 from services import ai_suggestion as ai_suggestion_service
 
@@ -55,6 +55,71 @@ def test_set_ai_suggestion(user_book_data, access_token, db_session, monkeypatch
     assert response.status_code == 201
     response_data = response.json()
 
+    assert response_data["insight_id"] == insight_id
+    assert response_data["clarified_insight"] == "テストA"
+    assert response_data["deep_dive"] == "テストB"
+    assert response_data["practical_application"] == "テストC"
+    assert response_data["next_action"] == "テストD"
+
+    ai_suggestion = db_session.get(AISuggestion, response_data["id"])
+    assert ai_suggestion is not None
+    assert ai_suggestion.insight_id == insight_id
+    assert ai_suggestion.clarified_insight == "テストA"
+    assert ai_suggestion.deep_dive == "テストB"
+    assert ai_suggestion.practical_application == "テストC"
+    assert ai_suggestion.next_action == "テストD"
+
+
+def test_set_ai_suggestion_after_deleting_user_book(
+    user_book_data, access_token, book_in_db, db_session, monkeypatch
+):
+    user_book_response = client.post(
+        "/users/me/books",
+        json=user_book_data,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert user_book_response.status_code == 201
+    user_book_id = user_book_response.json()["id"]
+    book_id = user_book_response.json()["book_id"]
+
+    insight_response = client.post(
+        f"/users/me/books/{book_id}/insights",
+        json={"content": "小さな挑戦が大事"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert insight_response.status_code == 201
+    insight_id = insight_response.json()["id"]
+
+    delete_response = client.delete(
+        f"/users/me/books/{book_id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert delete_response.status_code == 204
+    assert db_session.get(UserBook, user_book_id) is None
+
+    def fake_generate_ai_suggestion(content, title, author):
+        assert content == "小さな挑戦が大事"
+        assert title == book_in_db.title
+        assert author == book_in_db.author
+        return AISuggestionOutput(
+            clarified_insight="テストA",
+            deep_dive="テストB",
+            practical_application="テストC",
+            next_action="テストD",
+        )
+
+    monkeypatch.setattr(
+        ai_suggestion_service,
+        "generate_ai_suggestion",
+        fake_generate_ai_suggestion,
+    )
+
+    response = client.post(
+        f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 201
+    response_data = response.json()
     assert response_data["insight_id"] == insight_id
     assert response_data["clarified_insight"] == "テストA"
     assert response_data["deep_dive"] == "テストB"
@@ -476,6 +541,59 @@ def test_read_users_ai_suggestion(user_book_data, access_token, db_session):
     assert response_data["next_action"] == "テストD"
 
 
+def test_read_ai_suggestion_after_deleting_user_book(
+    user_book_data, access_token, db_session
+):
+    user_book_response = client.post(
+        "/users/me/books",
+        json=user_book_data,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert user_book_response.status_code == 201
+    user_book_id = user_book_response.json()["id"]
+    book_id = user_book_response.json()["book_id"]
+
+    insight_response = client.post(
+        f"/users/me/books/{book_id}/insights",
+        json={"content": "小さな挑戦が大事"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert insight_response.status_code == 201
+    insight_id = insight_response.json()["id"]
+
+    ai_suggestion = AISuggestion(
+        insight_id=insight_id,
+        clarified_insight="テストA",
+        deep_dive="テストB",
+        practical_application="テストC",
+        next_action="テストD",
+    )
+    db_session.add(ai_suggestion)
+    db_session.commit()
+    db_session.refresh(ai_suggestion)
+    ai_suggestion_id = ai_suggestion.id
+
+    delete_response = client.delete(
+        f"/users/me/books/{book_id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert delete_response.status_code == 204
+    assert db_session.get(UserBook, user_book_id) is None
+
+    response = client.get(
+        f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 200
+    response_data = response.json()
+    assert response_data["id"] == ai_suggestion_id
+    assert response_data["insight_id"] == insight_id
+    assert response_data["clarified_insight"] == "テストA"
+    assert response_data["deep_dive"] == "テストB"
+    assert response_data["practical_application"] == "テストC"
+    assert response_data["next_action"] == "テストD"
+
+
 def test_read_users_ai_suggestion_returns_404_when_not_registered(
     user_book_data, access_token
 ):
@@ -666,6 +784,116 @@ def test_delete_ai_suggestion(user_book_data, access_token, db_session):
 
     statement = select(AISuggestion).where(AISuggestion.id == ai_suggestion_id)
     assert db_session.scalar(statement) is None
+
+
+def test_delete_ai_suggestion_after_deleting_user_book(
+    user_book_data, access_token, db_session
+):
+    user_book_response = client.post(
+        "/users/me/books",
+        json=user_book_data,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert user_book_response.status_code == 201
+    user_book_id = user_book_response.json()["id"]
+    book_id = user_book_response.json()["book_id"]
+
+    insight_response = client.post(
+        f"/users/me/books/{book_id}/insights",
+        json={"content": "小さな挑戦が大事"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert insight_response.status_code == 201
+    insight_id = insight_response.json()["id"]
+
+    ai_suggestion = AISuggestion(
+        insight_id=insight_id,
+        clarified_insight="テストA",
+        deep_dive="テストB",
+        practical_application="テストC",
+        next_action="テストD",
+    )
+    db_session.add(ai_suggestion)
+    db_session.commit()
+    db_session.refresh(ai_suggestion)
+    ai_suggestion_id = ai_suggestion.id
+
+    user_book_delete_response = client.delete(
+        f"/users/me/books/{book_id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert user_book_delete_response.status_code == 204
+    assert db_session.get(UserBook, user_book_id) is None
+
+    response = client.delete(
+        f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 204
+    assert response.text == ""
+
+    statement = select(AISuggestion).where(AISuggestion.id == ai_suggestion_id)
+    assert db_session.scalar(statement) is None
+
+    insight = db_session.get(Insight, insight_id)
+    assert insight is not None
+    assert insight.content == "小さな挑戦が大事"
+    assert insight.book_id == book_id
+
+
+def test_delete_insight_deletes_ai_suggestion_after_deleting_user_book(
+    user_book_data, access_token, db_session
+):
+    user_book_response = client.post(
+        "/users/me/books",
+        json=user_book_data,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert user_book_response.status_code == 201
+    user_book_id = user_book_response.json()["id"]
+    book_id = user_book_response.json()["book_id"]
+
+    insight_response = client.post(
+        f"/users/me/books/{book_id}/insights",
+        json={"content": "小さな挑戦が大事"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert insight_response.status_code == 201
+    insight_id = insight_response.json()["id"]
+
+    ai_suggestion = AISuggestion(
+        insight_id=insight_id,
+        clarified_insight="テストA",
+        deep_dive="テストB",
+        practical_application="テストC",
+        next_action="テストD",
+    )
+    db_session.add(ai_suggestion)
+    db_session.commit()
+    db_session.refresh(ai_suggestion)
+    ai_suggestion_id = ai_suggestion.id
+
+    user_book_delete_response = client.delete(
+        f"/users/me/books/{book_id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert user_book_delete_response.status_code == 204
+    assert db_session.get(UserBook, user_book_id) is None
+    assert db_session.scalar(select(Insight).where(Insight.id == insight_id)) is not None
+    assert db_session.scalar(
+        select(AISuggestion).where(AISuggestion.id == ai_suggestion_id)
+    ) is not None
+
+    response = client.delete(
+        f"/users/me/books/{book_id}/insights/{insight_id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 204
+    assert response.text == ""
+    assert db_session.scalar(select(Insight).where(Insight.id == insight_id)) is None
+    assert db_session.scalar(
+        select(AISuggestion).where(AISuggestion.id == ai_suggestion_id)
+    ) is None
 
 
 def test_delete_ai_suggestion_returns_404_when_not_registered(

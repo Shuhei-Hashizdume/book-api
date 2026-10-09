@@ -1,7 +1,8 @@
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from main import app
-from models import Insight
+from models import Insight, UserBook
 
 client = TestClient(app)
 
@@ -27,7 +28,9 @@ def test_create_insight_for_other_users_book_returns_not_found(
     assert post_insight_response.status_code == 404
 
 
-def test_create_insight(user_book_data, access_token, db_session):
+def test_create_insight(
+    user_book_data, access_token, registered_user, book_in_db, db_session
+):
     post_response = client.post(
         "/users/me/books",
         json=user_book_data,
@@ -35,7 +38,6 @@ def test_create_insight(user_book_data, access_token, db_session):
     )
 
     assert post_response.status_code == 201
-    post_response_data = post_response.json()
     target_book_id = post_response.json()["book_id"]
 
     post_insight_response = client.post(
@@ -48,15 +50,18 @@ def test_create_insight(user_book_data, access_token, db_session):
     post_insight_response_data = post_insight_response.json()
     assert post_insight_response_data["content"] == "小さな挑戦が大事"
     assert isinstance(post_insight_response_data["id"], int)
+    assert post_insight_response_data["book_id"] == target_book_id
+    assert post_insight_response_data["book_title"] == book_in_db.title
 
     insight = db_session.get(Insight, post_insight_response_data["id"])
     assert insight is not None
-    assert insight.user_book_id == post_response_data["id"]
+    assert insight.user_id == registered_user.id
+    assert insight.book_id == target_book_id
     assert insight.content == "小さな挑戦が大事"
 
 
 def test_create_multiple_insights_for_same_book(
-    user_book_data, access_token, db_session
+    user_book_data, access_token, registered_user, db_session
 ):
     user_book_response = client.post(
         "/users/me/books",
@@ -91,8 +96,70 @@ def test_create_multiple_insights_for_same_book(
 
     assert first_insight is not None
     assert second_insight is not None
-    assert first_insight.user_book_id == user_book_response_data["id"]
-    assert second_insight.user_book_id == user_book_response_data["id"]
+    assert first_insight.user_id == registered_user.id
+    assert second_insight.user_id == registered_user.id
+    assert first_insight.book_id == target_book_id
+    assert second_insight.book_id == target_book_id
+
+
+def test_insight_remains_after_deleting_user_book(
+    user_book_data, access_token, registered_user, book_in_db, db_session
+):
+    user_book_response = client.post(
+        "/users/me/books",
+        json=user_book_data,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert user_book_response.status_code == 201
+    user_book_id = user_book_response.json()["id"]
+    book_id = user_book_response.json()["book_id"]
+
+    try:
+        insight_response = client.post(
+            f"/users/me/books/{book_id}/insights",
+            json={"content": "本の登録を削除しても残したい気づき"},
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        assert insight_response.status_code == 201
+        insight_id = insight_response.json()["id"]
+
+        delete_response = client.delete(
+            f"/users/me/books/{book_id}",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        assert delete_response.status_code == 204
+        assert db_session.get(UserBook, user_book_id) is None
+
+        insight = db_session.get(Insight, insight_id)
+        assert insight is not None
+        assert insight.user_id == registered_user.id
+        assert insight.book_id == book_id
+        assert insight.content == "本の登録を削除しても残したい気づき"
+
+        get_response = client.get(
+            f"/users/me/books/{book_id}/insights",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        assert get_response.status_code == 200
+        assert get_response.json() == [
+            {
+                "id": insight_id,
+                "content": "本の登録を削除しても残したい気づき",
+                "book_id": book_id,
+                "book_title": book_in_db.title,
+            }
+        ]
+    finally:
+        db_session.rollback()
+        insights = db_session.scalars(
+            select(Insight).where(
+                Insight.user_id == registered_user.id,
+                Insight.book_id == book_id,
+            )
+        ).all()
+        for insight in insights:
+            db_session.delete(insight)
+        db_session.commit()
 
 
 def test_create_insight_rejects_blank_content(user_book_data, access_token):
@@ -124,7 +191,7 @@ def test_create_insight_unauthorized_without_token(book_in_db):
 
 
 def test_read_insights_returns_multiple_insights_in_creation_order(
-    user_book_data, access_token
+    user_book_data, access_token, book_in_db
 ):
     user_book_response = client.post(
         "/users/me/books",
@@ -159,6 +226,10 @@ def test_read_insights_returns_multiple_insights_in_creation_order(
     assert len(response_data) == 2
     assert response_data[0]["content"] == "最初の気づき"
     assert response_data[1]["content"] == "次の気づき"
+    assert response_data[0]["book_id"] == target_book_id
+    assert response_data[1]["book_id"] == target_book_id
+    assert response_data[0]["book_title"] == book_in_db.title
+    assert response_data[1]["book_title"] == book_in_db.title
 
 
 def test_read_insights_returns_empty_list(user_book_data, access_token):
@@ -180,13 +251,14 @@ def test_read_insights_returns_empty_list(user_book_data, access_token):
     assert response.json() == []
 
 
-def test_read_insights_not_found(book_in_db, access_token):
+def test_read_insights_returns_empty_list_without_user_book(book_in_db, access_token):
     response = client.get(
         f"/users/me/books/{book_in_db.id}/insights",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
-    assert response.status_code == 404
+    assert response.status_code == 200
+    assert response.json() == []
 
 
 def test_read_insights_unauthorized_without_token(book_in_db):
@@ -220,6 +292,46 @@ def test_delete_insight(user_book_data, access_token, db_session):
     assert response.status_code == 204
     assert response.content == b""
     assert db_session.get(Insight, insight_id) is None
+
+
+def test_delete_insight_after_deleting_user_book(
+    user_book_data, access_token, db_session
+):
+    user_book_response = client.post(
+        "/users/me/books",
+        json=user_book_data,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert user_book_response.status_code == 201
+    book_id = user_book_response.json()["book_id"]
+
+    insight_response = client.post(
+        f"/users/me/books/{book_id}/insights",
+        json={"content": "本の登録削除後に削除する気づき"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert insight_response.status_code == 201
+    insight_id = insight_response.json()["id"]
+
+    user_book_delete_response = client.delete(
+        f"/users/me/books/{book_id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert user_book_delete_response.status_code == 204
+
+    insight_delete_response = client.delete(
+        f"/users/me/books/{book_id}/insights/{insight_id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert insight_delete_response.status_code == 204
+    assert db_session.get(Insight, insight_id) is None
+
+    get_response = client.get(
+        f"/users/me/books/{book_id}/insights",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert get_response.status_code == 200
+    assert get_response.json() == []
 
 
 def test_delete_insight_not_found_without_user_book(book_in_db, access_token):
@@ -277,7 +389,9 @@ def test_delete_insight_unauthorized_without_token(book_in_db):
     assert response.status_code == 401
 
 
-def test_update_insight(user_book_data, access_token, db_session):
+def test_update_insight(
+    user_book_data, access_token, registered_user, book_in_db, db_session
+):
     user_book_response = client.post(
         "/users/me/books",
         json=user_book_data,
@@ -306,11 +420,62 @@ def test_update_insight(user_book_data, access_token, db_session):
     response_data = response.json()
     assert response_data["id"] == insight_id
     assert response_data["content"] == "更新後の気づき"
+    assert response_data["book_id"] == target_book_id
+    assert response_data["book_title"] == book_in_db.title
 
     insight = db_session.get(Insight, insight_id)
     assert insight is not None
     assert insight.content == "更新後の気づき"
-    assert insight.user_book_id == user_book_response_data["id"]
+    assert insight.user_id == registered_user.id
+    assert insight.book_id == target_book_id
+
+
+def test_update_insight_after_deleting_user_book(
+    user_book_data, access_token, book_in_db
+):
+    user_book_response = client.post(
+        "/users/me/books",
+        json=user_book_data,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert user_book_response.status_code == 201
+    book_id = user_book_response.json()["book_id"]
+
+    insight_response = client.post(
+        f"/users/me/books/{book_id}/insights",
+        json={"content": "更新前の気づき"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert insight_response.status_code == 201
+    insight_id = insight_response.json()["id"]
+
+    delete_response = client.delete(
+        f"/users/me/books/{book_id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert delete_response.status_code == 204
+
+    update_response = client.patch(
+        f"/users/me/books/{book_id}/insights/{insight_id}",
+        json={"content": "本の登録削除後に更新した気づき"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert update_response.status_code == 200
+    assert update_response.json()["content"] == "本の登録削除後に更新した気づき"
+
+    get_response = client.get(
+        f"/users/me/books/{book_id}/insights",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert get_response.status_code == 200
+    assert get_response.json() == [
+        {
+            "id": insight_id,
+            "content": "本の登録削除後に更新した気づき",
+            "book_id": book_id,
+            "book_title": book_in_db.title,
+        }
+    ]
 
 
 def test_update_insight_rejects_blank_content(

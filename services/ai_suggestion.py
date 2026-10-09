@@ -4,7 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from config import settings
-from models import AISuggestion, Book, Insight, UserBook
+from models import AISuggestion, Book, Insight
 from schemas.ai_suggestion import AISuggestionOutput
 
 
@@ -34,12 +34,11 @@ def get_ai_suggestion_context(
             Book.author,
         )
         .select_from(Insight)
-        .join(UserBook, Insight.user_book_id == UserBook.id)
-        .join(Book, UserBook.book_id == Book.id)
+        .join(Book, Insight.book_id == Book.id)
         .where(
             Insight.id == insight_id,
-            UserBook.user_id == current_user_id,
-            UserBook.book_id == book_id,
+            Insight.user_id == current_user_id,
+            Insight.book_id == book_id,
         )
     )
 
@@ -154,11 +153,10 @@ def get_ai_suggestion(
     statement = (
         select(AISuggestion)
         .join(Insight, Insight.id == AISuggestion.insight_id)
-        .join(UserBook, UserBook.id == Insight.user_book_id)
         .where(
             AISuggestion.insight_id == insight_id,
-            UserBook.book_id == book_id,
-            UserBook.user_id == current_user_id,
+            Insight.book_id == book_id,
+            Insight.user_id == current_user_id,
         )
     )
 
