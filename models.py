@@ -81,9 +81,7 @@ class UserBook(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     book_id: Mapped[int] = mapped_column(ForeignKey("books.id"), nullable=False)
     book: Mapped[Book] = relationship()
-    insights: Mapped[list["Insight"]] = relationship(
-        back_populates="user_book", cascade="all, delete-orphan", passive_deletes=True
-    )
+
     priority: Mapped[ReadingPriority] = mapped_column(
         Enum(ReadingPriority, name="reading_priority"), nullable=False
     )
@@ -119,11 +117,10 @@ class UserBook(Base):
 class Insight(Base):
     __tablename__ = "insights"
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_book_id: Mapped[int] = mapped_column(
-        ForeignKey("user_books.id", ondelete="CASCADE"), nullable=False
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    book_id: Mapped[int] = mapped_column(ForeignKey("books.id"), nullable=False)
+    book: Mapped[Book] = relationship()
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    user_book: Mapped[UserBook] = relationship(back_populates="insights")
     ai_suggestion: Mapped["AISuggestion | None"] = relationship(
         cascade="all,delete-orphan", passive_deletes=True, back_populates="insight"
     )

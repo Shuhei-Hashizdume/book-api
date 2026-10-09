@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 
 from database import database_url, get_db
 from main import app
-from models import Book, User, UserBook
+from models import Book, Insight, User, UserBook
 from security import create_access_token, hash_password
 
 TEST_DATABASE_URL = database_url.set(database="book_api_test")
@@ -121,6 +121,12 @@ def user_book_data(book_in_db, registered_user):
     yield user_book_data
 
     with TestingSessionLocal() as db:
+        db.execute(
+            delete(Insight).where(
+                Insight.user_id == registered_user.id,
+                Insight.book_id == book_in_db.id,
+            )
+        )
         statement = select(UserBook).where(
             UserBook.user_id == registered_user.id,
             UserBook.book_id == book_in_db.id,
@@ -131,7 +137,7 @@ def user_book_data(book_in_db, registered_user):
             if user_book.reading_post is not None:
                 db.delete(user_book.reading_post)
             db.delete(user_book)
-            db.commit()
+        db.commit()
 
 
 @pytest.fixture
@@ -148,6 +154,7 @@ def other_user(db_session):
 
     yield user
 
+    db_session.execute(delete(Insight).where(Insight.user_id == user.id))
     db_session.execute(delete(UserBook).where(UserBook.user_id == user.id))
     db_session.delete(user)
     db_session.commit()
@@ -172,6 +179,7 @@ def third_user(db_session):
 
     yield user
 
+    db_session.execute(delete(Insight).where(Insight.user_id == user.id))
     db_session.execute(delete(UserBook).where(UserBook.user_id == user.id))
     db_session.delete(user)
     db_session.commit()

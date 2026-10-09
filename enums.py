@@ -1,6 +1,11 @@
 from enum import StrEnum
 
 
+class UserBookListType(StrEnum):
+    WANT_TO_READ = "want_to_read"
+    COMPLETED = "completed"
+
+
 class ReadingPriority(StrEnum):
     HIGH = "high"
     MEDIUM = "medium"

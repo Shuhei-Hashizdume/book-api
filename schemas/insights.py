@@ -9,6 +9,8 @@ class InsightCreate(BaseModel):
 class InsightResponse(BaseModel):
     id: int
     content: str
+    book_id: int
+    book_title: str
 
 
 class InsightUpdate(BaseModel):

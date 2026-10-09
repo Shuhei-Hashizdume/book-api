@@ -3,7 +3,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from enums import BookGenre
+from enums import BookGenre, ReadingPriority, ReadingStatus
 from main import app
 from models import Book, UserBook
 from routers import user_books
@@ -122,6 +122,119 @@ def test_read_user_books(user_book_data, access_token, book_in_db, db_session):
         == "https://example.com/my-bookshelf-cover.jpg"
     )
     assert len(get_response_data) == 1
+
+
+@pytest.mark.parametrize(
+    "list_type",
+    [None, "want_to_read", "completed"],
+)
+def test_read_user_books_filters_by_list_type_and_current_user(
+    list_type, access_token, registered_user, other_user, db_session
+):
+    unread_book = Book(title="未読の本", author="テスト著者")
+    reading_book = Book(title="読書中の本", author="テスト著者")
+    completed_book = Book(title="完読した本", author="テスト著者")
+    other_unread_book = Book(title="他人の未読本", author="テスト著者")
+    other_completed_book = Book(title="他人の完読本", author="テスト著者")
+    books = [
+        unread_book,
+        reading_book,
+        completed_book,
+        other_unread_book,
+        other_completed_book,
+    ]
+    db_session.add_all(books)
+    db_session.flush()
+
+    unread_user_book = UserBook(
+        user_id=registered_user.id,
+        book_id=unread_book.id,
+        priority=ReadingPriority.HIGH,
+        status=ReadingStatus.WANT_TO_READ,
+    )
+    reading_user_book = UserBook(
+        user_id=registered_user.id,
+        book_id=reading_book.id,
+        priority=ReadingPriority.HIGH,
+        status=ReadingStatus.READING,
+    )
+    completed_user_book = UserBook(
+        user_id=registered_user.id,
+        book_id=completed_book.id,
+        priority=ReadingPriority.HIGH,
+        status=ReadingStatus.COMPLETED,
+        recommendation_score=4,
+    )
+
+    other_shared_user_book = UserBook(
+        user_id=other_user.id,
+        book_id=reading_book.id,
+        priority=ReadingPriority.LOW,
+        status=ReadingStatus.COMPLETED,
+        recommendation_score=5,
+    )
+    other_unread_user_book = UserBook(
+        user_id=other_user.id,
+        book_id=other_unread_book.id,
+        priority=ReadingPriority.LOW,
+        status=ReadingStatus.WANT_TO_READ,
+    )
+    other_completed_user_book = UserBook(
+        user_id=other_user.id,
+        book_id=other_completed_book.id,
+        priority=ReadingPriority.LOW,
+        status=ReadingStatus.COMPLETED,
+        recommendation_score=3,
+    )
+    user_books = [
+        unread_user_book,
+        reading_user_book,
+        completed_user_book,
+        other_shared_user_book,
+        other_unread_user_book,
+        other_completed_user_book,
+    ]
+    db_session.add_all(user_books)
+
+    try:
+        db_session.commit()
+
+        params = {}
+        if list_type is not None:
+            params["list_type"] = list_type
+
+        response = client.get(
+            "/users/me/books",
+            params=params,
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        assert response.status_code == 200
+        response_data = response.json()
+
+        actual_items = []
+        for item in response_data:
+            actual_items.append((item["id"], item["book"]["id"], item["status"]))
+            assert item["priority"] == "high"
+
+        if list_type == "completed":
+            expected_items = [
+                (completed_user_book.id, completed_book.id, "completed"),
+            ]
+        else:
+            expected_items = [
+                (unread_user_book.id, unread_book.id, "want_to_read"),
+                (reading_user_book.id, reading_book.id, "reading"),
+            ]
+
+        assert sorted(actual_items) == sorted(expected_items)
+    finally:
+        db_session.rollback()
+        for user_book in user_books:
+            db_session.delete(user_book)
+        db_session.flush()
+        for book in books:
+            db_session.delete(book)
+        db_session.commit()
 
 
 def test_read_user_book_detail_returns_registered_state(

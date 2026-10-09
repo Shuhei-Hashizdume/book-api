@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 
 from dependencies import CurrentUserDep, SessionDep
-from enums import BookGenre, ReadingStatus
+from enums import BookGenre, ReadingStatus, UserBookListType
 from models import Book, UserBook
 from schemas.user_books import (
     UserBookCreate,
@@ -52,12 +52,20 @@ def create_user_book(
 
 
 @router.get("", response_model=list[UserBookListItem])
-def read_user_books(db: SessionDep, current_user: CurrentUserDep):
+def read_user_books(
+    db: SessionDep,
+    current_user: CurrentUserDep,
+    list_type: UserBookListType = UserBookListType.WANT_TO_READ,
+):
     statement = (
         select(UserBook)
         .options(joinedload(UserBook.book))
         .where(UserBook.user_id == current_user.id)
     )
+    if list_type == UserBookListType.COMPLETED:
+        statement = statement.where(UserBook.status == ReadingStatus.COMPLETED)
+    else:
+        statement = statement.where(UserBook.status != ReadingStatus.COMPLETED)
     user_books = db.scalars(statement).all()
     return user_books
 
