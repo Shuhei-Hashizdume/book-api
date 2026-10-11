@@ -9,6 +9,7 @@ from sqlalchemy.orm import joinedload
 from dependencies import CurrentUserDep, SessionDep
 from enums import BookGenre, ReadingStatus, UserBookListType
 from models import Book, BookRating, UserBook
+from schemas.book_ratings import BookRatingResponse, BookRatingUpdate
 from schemas.books import BookResponse
 from schemas.user_books import (
     UserBookCreate,
@@ -407,4 +408,37 @@ def create_user_book_from_search(
         recommendation_score=(
             book_rating.recommendation_score if book_rating is not None else None
         ),
+    )
+
+
+@router.patch("/{book_id}/book-rating", response_model=BookRatingResponse)
+def update_book_rating(
+    book_rating_data: BookRatingUpdate,
+    book_id: Annotated[int, Path(gt=0)],
+    current_user: CurrentUserDep,
+    db: SessionDep,
+):
+    book_rating_statement = (
+        select(BookRating)
+        .options(joinedload(BookRating.book))
+        .where(BookRating.book_id == book_id, BookRating.user_id == current_user.id)
+    )
+    book_rating = db.scalar(book_rating_statement)
+
+    if book_rating is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="この本の読書ステータスが完読でない為,おすすめ度が登録されていません。",
+        )
+
+    book_rating.recommendation_score = book_rating_data.recommendation_score
+
+    db.commit()
+    db.refresh(book_rating)
+
+    return BookRatingResponse(
+        id=book_rating.id,
+        book_id=book_rating.book.id,
+        title=book_rating.book.title,
+        recommendation_score=book_rating.recommendation_score,
     )

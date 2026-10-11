@@ -49,6 +49,7 @@ class BookRating(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     book_id: Mapped[int] = mapped_column(ForeignKey("books.id"))
     recommendation_score: Mapped[int] = mapped_column(nullable=False)
+    book: Mapped[Book] = relationship()
     __table_args__ = (
         UniqueConstraint(
             "user_id",
