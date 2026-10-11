@@ -2,9 +2,8 @@ from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
-from enums import ReadingPriority, ReadingStatus
 from main import app
-from models import Book, Follow, ReadingPost, UserBook
+from models import Book, BookRating, Follow, ReadingPost
 
 client = TestClient(app)
 
@@ -14,19 +13,19 @@ def test_read_recommended_timeline(registered_user, book_in_db, db_session):
     assert book is not None
     book.cover_image_url = "https://example.com/recommended-book-cover.jpg"
 
-    user_book = UserBook(
+    book_rating = BookRating(
         user_id=registered_user.id,
         book_id=book_in_db.id,
-        priority=ReadingPriority.HIGH,
-        status=ReadingStatus.COMPLETED,
         recommendation_score=5,
     )
-    db_session.add(user_book)
+    db_session.add(book_rating)
     db_session.commit()
-    db_session.refresh(user_book)
+    db_session.refresh(book_rating)
 
     reading_post = ReadingPost(
-        user_book_id=user_book.id,
+        user_id=book_rating.user_id,
+        book_id=book_rating.book_id,
+        recommendation_score=book_rating.recommendation_score,
         recommendation_reason="タイムラインで紹介する本",
         is_public=True,
     )
@@ -57,39 +56,39 @@ def test_read_recommended_timeline(registered_user, book_in_db, db_session):
     finally:
         db_session.delete(reading_post)
         db_session.flush()
-        db_session.delete(user_book)
+        db_session.delete(book_rating)
         db_session.commit()
 
 
 def test_recommended_timeline_excludes_private_posts(
     registered_user, other_user, book_in_db, db_session
 ):
-    public_user_book = UserBook(
+    public_book_rating = BookRating(
         user_id=registered_user.id,
         book_id=book_in_db.id,
-        priority=ReadingPriority.HIGH,
-        status=ReadingStatus.COMPLETED,
         recommendation_score=5,
     )
-    private_user_book = UserBook(
+    private_book_rating = BookRating(
         user_id=other_user.id,
         book_id=book_in_db.id,
-        priority=ReadingPriority.HIGH,
-        status=ReadingStatus.COMPLETED,
         recommendation_score=4,
     )
-    db_session.add_all([public_user_book, private_user_book])
+    db_session.add_all([public_book_rating, private_book_rating])
     db_session.commit()
-    db_session.refresh(public_user_book)
-    db_session.refresh(private_user_book)
+    db_session.refresh(public_book_rating)
+    db_session.refresh(private_book_rating)
 
     public_post = ReadingPost(
-        user_book_id=public_user_book.id,
+        user_id=public_book_rating.user_id,
+        book_id=public_book_rating.book_id,
+        recommendation_score=public_book_rating.recommendation_score,
         recommendation_reason="公開投稿",
         is_public=True,
     )
     private_post = ReadingPost(
-        user_book_id=private_user_book.id,
+        user_id=private_book_rating.user_id,
+        book_id=private_book_rating.book_id,
+        recommendation_score=private_book_rating.recommendation_score,
         recommendation_reason="非公開投稿",
         is_public=False,
     )
@@ -110,41 +109,41 @@ def test_recommended_timeline_excludes_private_posts(
         db_session.delete(public_post)
         db_session.delete(private_post)
         db_session.flush()
-        db_session.delete(public_user_book)
-        db_session.delete(private_user_book)
+        db_session.delete(public_book_rating)
+        db_session.delete(private_book_rating)
         db_session.commit()
 
 
 def test_recommended_timeline_orders_posts_by_newest(
     registered_user, other_user, book_in_db, db_session
 ):
-    older_user_book = UserBook(
+    older_book_rating = BookRating(
         user_id=registered_user.id,
         book_id=book_in_db.id,
-        priority=ReadingPriority.HIGH,
-        status=ReadingStatus.COMPLETED,
         recommendation_score=4,
     )
-    newer_user_book = UserBook(
+    newer_book_rating = BookRating(
         user_id=other_user.id,
         book_id=book_in_db.id,
-        priority=ReadingPriority.HIGH,
-        status=ReadingStatus.COMPLETED,
         recommendation_score=5,
     )
-    db_session.add_all([older_user_book, newer_user_book])
+    db_session.add_all([older_book_rating, newer_book_rating])
     db_session.commit()
-    db_session.refresh(older_user_book)
-    db_session.refresh(newer_user_book)
+    db_session.refresh(older_book_rating)
+    db_session.refresh(newer_book_rating)
 
     older_post = ReadingPost(
-        user_book_id=older_user_book.id,
+        user_id=older_book_rating.user_id,
+        book_id=older_book_rating.book_id,
+        recommendation_score=older_book_rating.recommendation_score,
         recommendation_reason="古い公開投稿",
         is_public=True,
         created_at=datetime(2026, 9, 25, tzinfo=timezone.utc),
     )
     newer_post = ReadingPost(
-        user_book_id=newer_user_book.id,
+        user_id=newer_book_rating.user_id,
+        book_id=newer_book_rating.book_id,
+        recommendation_score=newer_book_rating.recommendation_score,
         recommendation_reason="新しい公開投稿",
         is_public=True,
         created_at=datetime(2026, 9, 26, tzinfo=timezone.utc),
@@ -167,8 +166,8 @@ def test_recommended_timeline_orders_posts_by_newest(
         db_session.delete(newer_post)
         db_session.delete(older_post)
         db_session.flush()
-        db_session.delete(newer_user_book)
-        db_session.delete(older_user_book)
+        db_session.delete(newer_book_rating)
+        db_session.delete(older_book_rating)
         db_session.commit()
 
 
@@ -190,19 +189,19 @@ def test_read_following_timeline(
         follower_id=registered_user.id,
         followed_id=other_user.id,
     )
-    user_book = UserBook(
+    book_rating = BookRating(
         user_id=other_user.id,
         book_id=book_in_db.id,
-        priority=ReadingPriority.HIGH,
-        status=ReadingStatus.COMPLETED,
         recommendation_score=5,
     )
-    db_session.add_all([follow, user_book])
+    db_session.add_all([follow, book_rating])
     db_session.commit()
-    db_session.refresh(user_book)
+    db_session.refresh(book_rating)
 
     reading_post = ReadingPost(
-        user_book_id=user_book.id,
+        user_id=book_rating.user_id,
+        book_id=book_rating.book_id,
+        recommendation_score=book_rating.recommendation_score,
         recommendation_reason="フォロー中タイムラインで紹介する本",
         is_public=True,
     )
@@ -238,7 +237,7 @@ def test_read_following_timeline(
     finally:
         db_session.delete(reading_post)
         db_session.flush()
-        db_session.delete(user_book)
+        db_session.delete(book_rating)
         db_session.delete(follow)
         db_session.commit()
 
@@ -250,19 +249,19 @@ def test_following_timeline_excludes_private_posts(
         follower_id=registered_user.id,
         followed_id=other_user.id,
     )
-    user_book = UserBook(
+    book_rating = BookRating(
         user_id=other_user.id,
         book_id=book_in_db.id,
-        priority=ReadingPriority.HIGH,
-        status=ReadingStatus.COMPLETED,
         recommendation_score=5,
     )
-    db_session.add_all([follow, user_book])
+    db_session.add_all([follow, book_rating])
     db_session.commit()
-    db_session.refresh(user_book)
+    db_session.refresh(book_rating)
 
     private_post = ReadingPost(
-        user_book_id=user_book.id,
+        user_id=book_rating.user_id,
+        book_id=book_rating.book_id,
+        recommendation_score=book_rating.recommendation_score,
         recommendation_reason="フォロー先の非公開投稿",
         is_public=False,
     )
@@ -280,7 +279,7 @@ def test_following_timeline_excludes_private_posts(
     finally:
         db_session.delete(private_post)
         db_session.flush()
-        db_session.delete(user_book)
+        db_session.delete(book_rating)
         db_session.delete(follow)
         db_session.commit()
 
@@ -288,19 +287,19 @@ def test_following_timeline_excludes_private_posts(
 def test_following_timeline_excludes_posts_from_unfollowed_users(
     other_user, book_in_db, db_session, access_token
 ):
-    user_book = UserBook(
+    book_rating = BookRating(
         user_id=other_user.id,
         book_id=book_in_db.id,
-        priority=ReadingPriority.HIGH,
-        status=ReadingStatus.COMPLETED,
         recommendation_score=5,
     )
-    db_session.add(user_book)
+    db_session.add(book_rating)
     db_session.commit()
-    db_session.refresh(user_book)
+    db_session.refresh(book_rating)
 
     public_post = ReadingPost(
-        user_book_id=user_book.id,
+        user_id=book_rating.user_id,
+        book_id=book_rating.book_id,
+        recommendation_score=book_rating.recommendation_score,
         recommendation_reason="フォローしていないユーザーの公開投稿",
         is_public=True,
     )
@@ -318,7 +317,7 @@ def test_following_timeline_excludes_posts_from_unfollowed_users(
     finally:
         db_session.delete(public_post)
         db_session.flush()
-        db_session.delete(user_book)
+        db_session.delete(book_rating)
         db_session.commit()
 
 
@@ -344,35 +343,35 @@ def test_following_timeline_orders_posts_by_newest(
         follower_id=registered_user.id,
         followed_id=third_user.id,
     )
-    older_user_book = UserBook(
+    older_book_rating = BookRating(
         user_id=other_user.id,
         book_id=book_in_db.id,
-        priority=ReadingPriority.HIGH,
-        status=ReadingStatus.COMPLETED,
         recommendation_score=4,
     )
-    newer_user_book = UserBook(
+    newer_book_rating = BookRating(
         user_id=third_user.id,
         book_id=book_in_db.id,
-        priority=ReadingPriority.HIGH,
-        status=ReadingStatus.COMPLETED,
         recommendation_score=5,
     )
     db_session.add_all(
-        [older_follow, newer_follow, older_user_book, newer_user_book]
+        [older_follow, newer_follow, older_book_rating, newer_book_rating]
     )
     db_session.commit()
-    db_session.refresh(older_user_book)
-    db_session.refresh(newer_user_book)
+    db_session.refresh(older_book_rating)
+    db_session.refresh(newer_book_rating)
 
     older_post = ReadingPost(
-        user_book_id=older_user_book.id,
+        user_id=older_book_rating.user_id,
+        book_id=older_book_rating.book_id,
+        recommendation_score=older_book_rating.recommendation_score,
         recommendation_reason="フォロー先の古い公開投稿",
         is_public=True,
         created_at=datetime(2026, 9, 25, tzinfo=timezone.utc),
     )
     newer_post = ReadingPost(
-        user_book_id=newer_user_book.id,
+        user_id=newer_book_rating.user_id,
+        book_id=newer_book_rating.book_id,
+        recommendation_score=newer_book_rating.recommendation_score,
         recommendation_reason="フォロー先の新しい公開投稿",
         is_public=True,
         created_at=datetime(2026, 9, 26, tzinfo=timezone.utc),
@@ -397,8 +396,8 @@ def test_following_timeline_orders_posts_by_newest(
         db_session.delete(newer_post)
         db_session.delete(older_post)
         db_session.flush()
-        db_session.delete(newer_user_book)
-        db_session.delete(older_user_book)
+        db_session.delete(newer_book_rating)
+        db_session.delete(older_book_rating)
         db_session.delete(newer_follow)
         db_session.delete(older_follow)
         db_session.commit()

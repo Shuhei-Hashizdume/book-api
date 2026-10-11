@@ -25,19 +25,18 @@ def get_user_profile(user_id: int, db: Session) -> UserProfileResponse | None:
 
     public_books_statement = (
         select(
-            UserBook.book_id,
+            ReadingPost.book_id,
             ReadingPost.id.label("reading_post_id"),
             Book.title,
             Book.author,
             Book.genre,
             Book.cover_image_url,
-            UserBook.recommendation_score,
+            ReadingPost.recommendation_score,
             ReadingPost.recommendation_reason,
         )
-        .select_from(UserBook)
-        .join(Book, UserBook.book_id == Book.id)
-        .join(ReadingPost, UserBook.id == ReadingPost.user_book_id)
-        .where(UserBook.user_id == user.id, ReadingPost.is_public.is_(True))
+        .select_from(ReadingPost)
+        .join(Book, ReadingPost.book_id == Book.id)
+        .where(ReadingPost.user_id == user.id, ReadingPost.is_public.is_(True))
         .order_by(ReadingPost.created_at.desc())
     )
     public_book_rows = db.execute(public_books_statement).mappings().all()

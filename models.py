@@ -43,6 +43,25 @@ class Book(Base):
     )
 
 
+class BookRating(Base):
+    __tablename__ = "book_ratings"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    book_id: Mapped[int] = mapped_column(ForeignKey("books.id"))
+    recommendation_score: Mapped[int] = mapped_column(nullable=False)
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "book_id",
+            name="uq_book_ratings_user_id_book_id",
+        ),
+        CheckConstraint(
+            "recommendation_score BETWEEN 1 AND 5",
+            name="ck_book_ratings_recommendation_score_range",
+        ),
+    )
+
+
 class User(Base):
     __tablename__ = "users"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -90,10 +109,6 @@ class UserBook(Base):
         nullable=False,
         default=ReadingStatus.WANT_TO_READ,
     )
-    recommendation_score: Mapped[int | None] = mapped_column(nullable=True)
-    reading_post: Mapped["ReadingPost | None"] = relationship(
-        back_populates="user_book"
-    )
     reading_reminder: Mapped["ReadingReminder | None"] = relationship(
         back_populates="user_book", cascade="all, delete-orphan", passive_deletes=True
     )
@@ -102,14 +117,6 @@ class UserBook(Base):
             "user_id",
             "book_id",
             name="uq_user_books_user_id_book_id",
-        ),
-        CheckConstraint(
-            "recommendation_score IS NULL OR recommendation_score BETWEEN 1 AND 5",
-            name="ck_user_books_recommendation_score_range",
-        ),
-        CheckConstraint(
-            "status != 'COMPLETED' OR recommendation_score IS NOT NULL",
-            name="ck_user_books_completed_requires_recommendation_score",
         ),
     )
 
@@ -134,9 +141,9 @@ class ReadingPost(Base):
         server_default=func.now(),
         nullable=False,
     )
-    user_book_id: Mapped[int] = mapped_column(
-        ForeignKey("user_books.id"), nullable=False
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    book_id: Mapped[int] = mapped_column(ForeignKey("books.id"))
+    recommendation_score: Mapped[int] = mapped_column(nullable=False)
     recommendation_reason: Mapped[str] = mapped_column(
         Text,
         nullable=False,
@@ -144,9 +151,16 @@ class ReadingPost(Base):
     is_public: Mapped[bool] = mapped_column(
         default=True, server_default=true(), nullable=False
     )
-    user_book: Mapped[UserBook] = relationship(back_populates="reading_post")
     __table_args__ = (
-        UniqueConstraint("user_book_id", name="uq_reading_posts_user_book_id"),
+        UniqueConstraint(
+            "user_id",
+            "book_id",
+            name="uq_reading_posts_user_id_book_id",
+        ),
+        CheckConstraint(
+            "recommendation_score BETWEEN 1 AND 5",
+            name="ck_reading_posts_recommendation_score_range",
+        ),
         CheckConstraint(
             "char_length(recommendation_reason) BETWEEN 1 AND 1000",
             name="ck_reading_posts_recommendation_reason_length",

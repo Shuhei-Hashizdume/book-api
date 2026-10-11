@@ -23,7 +23,7 @@ def create_like(reading_post_id: int, current_user: CurrentUserDep, db: SessionD
             status_code=status.HTTP_404_NOT_FOUND,
             detail="読了投稿が見つかりません。",
         )
-    if reading_post.user_book.user_id == current_user.id:
+    if reading_post.user_id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="自分の投稿へいいね!はできません。",

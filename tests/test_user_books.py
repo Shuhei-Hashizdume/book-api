@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from enums import BookGenre, ReadingPriority, ReadingStatus
 from main import app
-from models import Book, UserBook
+from models import Book, BookRating, ReadingPost, UserBook
 from routers import user_books
 from schemas.books import BookSearchResult
 
@@ -44,7 +44,66 @@ def test_create_user_book(user_book_data, access_token, db_session, registered_u
     assert user_book.book_id == user_book_data["book_id"]
     assert user_book.priority.value == user_book_data["priority"]
     assert user_book.status.value == "want_to_read"
-    assert user_book.recommendation_score is None
+
+    book_rating = db_session.scalar(
+        select(BookRating).where(
+            BookRating.book_id == user_book.book_id,
+            BookRating.user_id == registered_user.id,
+        )
+    )
+    assert book_rating is None
+
+
+def test_create_user_book_preserves_rating_after_reregistration(
+    user_book_data, registered_user, access_token, db_session
+):
+    create_response = client.post(
+        "/users/me/books",
+        json=user_book_data,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert create_response.status_code == 201
+    target_book_id = create_response.json()["book_id"]
+
+    status_response = client.patch(
+        f"/users/me/books/{target_book_id}/status",
+        json={"status": "completed", "recommendation_score": 5},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert status_response.status_code == 200
+
+    delete_response = client.delete(
+        f"/users/me/books/{target_book_id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert delete_response.status_code == 204
+
+    reregister_response = client.post(
+        "/users/me/books",
+        json=user_book_data,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert reregister_response.status_code == 201
+    response_data = reregister_response.json()
+    assert response_data["book_id"] == target_book_id
+    assert response_data["status"] == "want_to_read"
+    assert response_data["recommendation_score"] == 5
+
+    user_book = db_session.get(UserBook, response_data["id"])
+    assert user_book is not None
+    assert user_book.status == ReadingStatus.WANT_TO_READ
+
+    statement = select(BookRating).where(
+        BookRating.user_id == registered_user.id,
+        BookRating.book_id == target_book_id,
+    )
+    book_ratings = db_session.scalars(statement).all()
+    assert len(book_ratings) == 1
+    assert book_ratings[0].recommendation_score == 5
 
 
 def test_create_user_book_conflict_with_duplicate_book(user_book_data, access_token):
@@ -163,7 +222,6 @@ def test_read_user_books_filters_by_list_type_and_current_user(
         book_id=completed_book.id,
         priority=ReadingPriority.HIGH,
         status=ReadingStatus.COMPLETED,
-        recommendation_score=4,
     )
 
     other_shared_user_book = UserBook(
@@ -171,7 +229,6 @@ def test_read_user_books_filters_by_list_type_and_current_user(
         book_id=reading_book.id,
         priority=ReadingPriority.LOW,
         status=ReadingStatus.COMPLETED,
-        recommendation_score=5,
     )
     other_unread_user_book = UserBook(
         user_id=other_user.id,
@@ -184,7 +241,6 @@ def test_read_user_books_filters_by_list_type_and_current_user(
         book_id=other_completed_book.id,
         priority=ReadingPriority.LOW,
         status=ReadingStatus.COMPLETED,
-        recommendation_score=3,
     )
     user_books = [
         unread_user_book,
@@ -195,6 +251,28 @@ def test_read_user_books_filters_by_list_type_and_current_user(
         other_completed_user_book,
     ]
     db_session.add_all(user_books)
+
+    completed_book_rating = BookRating(
+        user_id=registered_user.id,
+        book_id=completed_book.id,
+        recommendation_score=4,
+    )
+    other_shared_book_rating = BookRating(
+        user_id=other_user.id,
+        book_id=reading_book.id,
+        recommendation_score=5,
+    )
+    other_completed_book_rating = BookRating(
+        user_id=other_user.id,
+        book_id=other_completed_book.id,
+        recommendation_score=3,
+    )
+    book_ratings = [
+        completed_book_rating,
+        other_shared_book_rating,
+        other_completed_book_rating,
+    ]
+    db_session.add_all(book_ratings)
 
     try:
         db_session.commit()
@@ -229,6 +307,8 @@ def test_read_user_books_filters_by_list_type_and_current_user(
         assert sorted(actual_items) == sorted(expected_items)
     finally:
         db_session.rollback()
+        for book_rating in book_ratings:
+            db_session.delete(book_rating)
         for user_book in user_books:
             db_session.delete(user_book)
         db_session.flush()
@@ -485,7 +565,7 @@ def test_update_user_book_status_unauthorized(book_in_db):
 
 
 def test_user_book_status_to_completed_with_recommendation_score(
-    access_token, user_book_data, db_session
+    access_token, user_book_data, db_session, registered_user
 ):
     post_response = client.post(
         "/users/me/books",
@@ -511,14 +591,22 @@ def test_user_book_status_to_completed_with_recommendation_score(
     assert patch_response_data["status"] == "completed"
     assert patch_response_data["recommendation_score"] == 5
 
+    book_rating = db_session.scalar(
+        select(BookRating).where(
+            BookRating.book_id == target_book_id,
+            BookRating.user_id == registered_user.id,
+        )
+    )
+    assert book_rating is not None
+    assert book_rating.recommendation_score == 5
+
     user_book = db_session.get(UserBook, patch_response_data["id"])
     assert user_book is not None
     assert user_book.status.value == "completed"
-    assert user_book.recommendation_score == 5
 
 
 def test_update_user_book_recommendation_score(
-    user_book_data, access_token, db_session
+    user_book_data, access_token, db_session, registered_user
 ):
     post_response = client.post(
         "/users/me/books",
@@ -554,14 +642,22 @@ def test_update_user_book_recommendation_score(
     assert status_patch_response_data["id"] == patch_response_data["id"]
     assert patch_response_data["status"] == "completed"
 
+    book_rating = db_session.scalar(
+        select(BookRating).where(
+            BookRating.book_id == target_book_id,
+            BookRating.user_id == registered_user.id,
+        )
+    )
+    assert book_rating is not None
+    assert book_rating.recommendation_score == 4
+
     user_book = db_session.get(UserBook, patch_response_data["id"])
     assert user_book is not None
-    assert user_book.recommendation_score == 4
     assert user_book.status.value == "completed"
 
 
 def test_update_user_book_recommendation_score_before_completed(
-    user_book_data, access_token, db_session
+    user_book_data, access_token, db_session, registered_user
 ):
     post_response = client.post(
         "/users/me/books",
@@ -584,12 +680,19 @@ def test_update_user_book_recommendation_score_before_completed(
     user_book = db_session.get(UserBook, post_response_data["id"])
     assert user_book is not None
     assert user_book.status.value == "want_to_read"
-    assert user_book.recommendation_score is None
+
+    book_rating = db_session.scalar(
+        select(BookRating).where(
+            BookRating.book_id == target_book_id,
+            BookRating.user_id == registered_user.id,
+        )
+    )
+    assert book_rating is None
 
 
 @pytest.mark.parametrize("recommendation_score", [0, 6])
 def test_update_user_book_recommendation_score_with_outrange(
-    user_book_data, access_token, db_session, recommendation_score
+    user_book_data, access_token, db_session, recommendation_score, registered_user
 ):
     post_response = client.post(
         "/users/me/books",
@@ -622,7 +725,15 @@ def test_update_user_book_recommendation_score_with_outrange(
 
     user_book = db_session.get(UserBook, status_patch_response_data["id"])
     assert user_book is not None
-    assert user_book.recommendation_score == 5
+
+    book_rating = db_session.scalar(
+        select(BookRating).where(
+            BookRating.book_id == target_book_id,
+            BookRating.user_id == registered_user.id,
+        )
+    )
+    assert book_rating is not None
+    assert book_rating.recommendation_score == 5
 
 
 def test_update_user_book_recommendation_score_not_found(book_in_db, access_token):
@@ -713,7 +824,14 @@ def test_create_user_book_from_search_creates_book_and_user_book(
     assert saved_user_book.book_id == saved_book.id
     assert saved_user_book.priority.value == "high"
     assert saved_user_book.status.value == "want_to_read"
-    assert saved_user_book.recommendation_score is None
+
+    book_rating = db_session.scalar(
+        select(BookRating).where(
+            BookRating.user_id == registered_user.id,
+            BookRating.book_id == saved_book.id,
+        )
+    )
+    assert book_rating is None
 
     db_session.delete(saved_user_book)
     db_session.flush()
@@ -792,8 +910,7 @@ def test_create_user_book_from_search_reuses_existing_book(
     assert existing_book.isbn == "9780000000012"
     assert existing_book.genre == BookGenre.BUSINESS
     assert (
-        existing_book.cover_image_url
-        == "https://example.com/existing-book-small.jpg"
+        existing_book.cover_image_url == "https://example.com/existing-book-small.jpg"
     )
 
     db_session.delete(saved_user_book)
@@ -1221,8 +1338,8 @@ def test_create_user_book_from_search_returns_gateway_timeout(
     }
 
 
-def test_update_completed_status_with_reading_post_returns_conflict(
-    user_book_data, access_token, db_session
+def test_update_completed_status_preserves_rating_and_reading_post(
+    user_book_data, registered_user, access_token, db_session
 ):
     post_response = client.post(
         "/users/me/books",
@@ -1256,17 +1373,32 @@ def test_update_completed_status_with_reading_post_returns_conflict(
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
-    assert status_response.status_code == 409
+    assert status_response.status_code == 200
+    assert status_response.json()["status"] == "reading"
+    assert status_response.json()["recommendation_score"] == 5
 
     user_book = db_session.get(UserBook, post_response_data["id"])
     assert user_book is not None
-    assert user_book.status.value == "completed"
-    assert user_book.recommendation_score == 5
-    assert user_book.reading_post is not None
+    assert user_book.status == ReadingStatus.READING
+
+    statement = select(BookRating).where(
+        BookRating.user_id == registered_user.id,
+        BookRating.book_id == target_book_id,
+    )
+    book_rating = db_session.scalar(statement)
+    assert book_rating is not None
+    assert book_rating.recommendation_score == 5
+
+    reading_post = db_session.get(ReadingPost, reading_post_response.json()["id"])
+    assert reading_post is not None
+    assert reading_post.user_id == registered_user.id
+    assert reading_post.book_id == target_book_id
+    assert reading_post.recommendation_score == 5
+    assert reading_post.recommendation_reason == "学びが多い"
 
 
-def test_delete_user_book_with_reading_post_returns_conflict(
-    user_book_data, access_token, db_session
+def test_delete_user_book_preserves_rating_and_reading_post(
+    user_book_data, registered_user, access_token, db_session
 ):
     post_response = client.post(
         "/users/me/books",
@@ -1299,12 +1431,27 @@ def test_delete_user_book_with_reading_post_returns_conflict(
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
-    assert delete_response.status_code == 409
+    assert delete_response.status_code == 204
+    assert delete_response.content == b""
 
     user_book = db_session.get(UserBook, post_response_data["id"])
-    assert user_book is not None
-    assert user_book.reading_post is not None
-    assert user_book.reading_post.id == reading_post_response.json()["id"]
+    assert user_book is None
+
+    statement = select(BookRating).where(
+        BookRating.user_id == registered_user.id,
+        BookRating.book_id == target_book_id,
+    )
+    book_rating = db_session.scalar(statement)
+    assert book_rating is not None
+    assert book_rating.recommendation_score == 5
+
+    reading_post = db_session.get(ReadingPost, reading_post_response.json()["id"])
+    assert reading_post is not None
+    assert reading_post.user_id == registered_user.id
+    assert reading_post.book_id == target_book_id
+    assert reading_post.recommendation_score == 5
+    assert reading_post.recommendation_reason == "学びが多い"
+    assert db_session.get(Book, target_book_id) is not None
 
 
 @pytest.mark.parametrize("incoming_isbn", [None, "9780000000020"])

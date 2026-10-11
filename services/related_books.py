@@ -1,7 +1,7 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from models import Book, UserBook
+from models import Book, BookRating
 from schemas.books import RelatedBookResponse
 
 
@@ -11,7 +11,7 @@ def get_related_books(book_id: int, db: Session) -> list[RelatedBookResponse] | 
     if target_book is None:
         return None
 
-    average_recommendation_score = func.avg(UserBook.recommendation_score).label(
+    average_recommendation_score = func.avg(BookRating.recommendation_score).label(
         "average_recommendation_score"
     )
 
@@ -22,7 +22,7 @@ def get_related_books(book_id: int, db: Session) -> list[RelatedBookResponse] | 
             Book.cover_image_url,
             average_recommendation_score,
         )
-        .outerjoin(UserBook, UserBook.book_id == Book.id)
+        .outerjoin(BookRating, BookRating.book_id == Book.id)
         .where(Book.genre == target_book.genre, Book.id != target_book.id)
         .group_by(Book.id)
         .order_by(average_recommendation_score.desc().nulls_last())

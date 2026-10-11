@@ -1,10 +1,10 @@
 import pytest
-from sqlalchemy import create_engine, delete, select
+from sqlalchemy import create_engine, delete
 from sqlalchemy.orm import sessionmaker
 
 from database import database_url, get_db
 from main import app
-from models import Book, Insight, User, UserBook
+from models import Book, BookRating, Insight, ReadingPost, User, UserBook
 from security import create_access_token, hash_password
 
 TEST_DATABASE_URL = database_url.set(database="book_api_test")
@@ -127,16 +127,27 @@ def user_book_data(book_in_db, registered_user):
                 Insight.book_id == book_in_db.id,
             )
         )
-        statement = select(UserBook).where(
-            UserBook.user_id == registered_user.id,
-            UserBook.book_id == book_in_db.id,
-        )
-        user_book = db.scalar(statement)
 
-        if user_book is not None:
-            if user_book.reading_post is not None:
-                db.delete(user_book.reading_post)
-            db.delete(user_book)
+        db.execute(
+            delete(UserBook).where(
+                UserBook.user_id == registered_user.id,
+                UserBook.book_id == book_in_db.id,
+            )
+        )
+
+        db.execute(
+            delete(ReadingPost).where(
+                ReadingPost.book_id == book_in_db.id,
+                ReadingPost.user_id == registered_user.id,
+            )
+        )
+        db.execute(
+            delete(BookRating).where(
+                BookRating.book_id == book_in_db.id,
+                BookRating.user_id == registered_user.id,
+            )
+        )
+
         db.commit()
 
 

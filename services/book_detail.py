@@ -1,14 +1,14 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from models import Book, UserBook
+from models import Book, BookRating
 from schemas.books import BookDetailResponse
 
 
 def get_book_with_average_score(book_id: int, db: Session) -> BookDetailResponse | None:
     statement = (
-        select(Book, func.avg(UserBook.recommendation_score))
-        .outerjoin(UserBook, UserBook.book_id == Book.id)
+        select(Book, func.avg(BookRating.recommendation_score))
+        .outerjoin(BookRating, BookRating.book_id == Book.id)
         .where(Book.id == book_id)
         .group_by(Book.id)
     )

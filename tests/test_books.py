@@ -2,9 +2,8 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from enums import ReadingPriority, ReadingStatus
 from main import app
-from models import Book, UserBook
+from models import Book, BookRating
 
 client = TestClient(app)
 
@@ -79,37 +78,38 @@ def test_read_book_returns_average_recommendation_score(
     third_user,
     db_session,
 ):
-    first_user_book = UserBook(
+    first_book_rating = BookRating(
         user_id=registered_user.id,
         book_id=user_book_data["book_id"],
-        priority=ReadingPriority.HIGH,
-        status=ReadingStatus.COMPLETED,
         recommendation_score=5,
     )
-    second_user_book = UserBook(
+    second_book_rating = BookRating(
         user_id=other_user.id,
         book_id=user_book_data["book_id"],
-        priority=ReadingPriority.HIGH,
-        status=ReadingStatus.COMPLETED,
         recommendation_score=4,
     )
-    third_user_book = UserBook(
+    third_book_rating = BookRating(
         user_id=third_user.id,
         book_id=user_book_data["book_id"],
-        priority=ReadingPriority.HIGH,
-        status=ReadingStatus.COMPLETED,
         recommendation_score=4,
     )
 
-    db_session.add(first_user_book)
-    db_session.add(second_user_book)
-    db_session.add(third_user_book)
+    db_session.add(first_book_rating)
+    db_session.add(second_book_rating)
+    db_session.add(third_book_rating)
     db_session.commit()
 
-    response = client.get(f'/books/{user_book_data["book_id"]}')
+    try:
+        response = client.get(f'/books/{user_book_data["book_id"]}')
 
-    assert response.status_code == 200
-    assert response.json()["average_recommendation_score"] == 4.3
+        assert response.status_code == 200
+        assert response.json()["average_recommendation_score"] == 4.3
+    finally:
+        db_session.rollback()
+        db_session.delete(first_book_rating)
+        db_session.delete(second_book_rating)
+        db_session.delete(third_book_rating)
+        db_session.commit()
 
 
 def test_read_book_not_found():

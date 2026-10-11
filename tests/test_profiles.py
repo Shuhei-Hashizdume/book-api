@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from enums import ReadingPriority, ReadingStatus
 from main import app
-from models import Book, Follow, ReadingPost, UserBook
+from models import Book, BookRating, Follow, ReadingPost, UserBook
 
 client = TestClient(app)
 
@@ -21,14 +21,17 @@ def test_read_user_profile(registered_user, other_user, book_in_db, db_session):
         book_id=book_in_db.id,
         priority=ReadingPriority.HIGH,
         status=ReadingStatus.COMPLETED,
+    )
+    book_rating = BookRating(
+        user_id=registered_user.id,
+        book_id=book_in_db.id,
         recommendation_score=5,
     )
-    db_session.add(user_book)
-    db_session.commit()
-    db_session.refresh(user_book)
 
     reading_post = ReadingPost(
-        user_book_id=user_book.id,
+        user_id=registered_user.id,
+        book_id=book_in_db.id,
+        recommendation_score=book_rating.recommendation_score,
         recommendation_reason="テスト用のおすすめ理由",
         is_public=True,
     )
@@ -36,7 +39,7 @@ def test_read_user_profile(registered_user, other_user, book_in_db, db_session):
         follower_id=other_user.id,
         followed_id=registered_user.id,
     )
-    db_session.add_all([reading_post, follow])
+    db_session.add_all([user_book, book_rating, reading_post, follow])
     db_session.commit()
     db_session.refresh(reading_post)
 
@@ -69,6 +72,7 @@ def test_read_user_profile(registered_user, other_user, book_in_db, db_session):
         db_session.delete(reading_post)
         db_session.flush()
         db_session.delete(user_book)
+        db_session.delete(book_rating)
         db_session.delete(follow)
         db_session.commit()
 
@@ -102,18 +106,21 @@ def test_read_user_profile_excludes_private_reading_post(
         book_id=book_in_db.id,
         priority=ReadingPriority.HIGH,
         status=ReadingStatus.COMPLETED,
+    )
+    book_rating = BookRating(
+        user_id=registered_user.id,
+        book_id=book_in_db.id,
         recommendation_score=5,
     )
-    db_session.add(user_book)
-    db_session.commit()
-    db_session.refresh(user_book)
 
     reading_post = ReadingPost(
-        user_book_id=user_book.id,
+        user_id=registered_user.id,
+        book_id=book_in_db.id,
+        recommendation_score=book_rating.recommendation_score,
         recommendation_reason="非公開のおすすめ理由",
         is_public=False,
     )
-    db_session.add(reading_post)
+    db_session.add_all([user_book, book_rating, reading_post])
     db_session.commit()
 
     try:
@@ -127,6 +134,7 @@ def test_read_user_profile_excludes_private_reading_post(
         db_session.delete(reading_post)
         db_session.flush()
         db_session.delete(user_book)
+        db_session.delete(book_rating)
         db_session.commit()
 
 
@@ -147,33 +155,50 @@ def test_read_user_profile_orders_public_books_by_newest_post(
         book_id=book_in_db.id,
         priority=ReadingPriority.HIGH,
         status=ReadingStatus.COMPLETED,
-        recommendation_score=4,
     )
     newer_user_book = UserBook(
         user_id=registered_user.id,
         book_id=second_book.id,
         priority=ReadingPriority.HIGH,
         status=ReadingStatus.COMPLETED,
+    )
+    older_book_rating = BookRating(
+        user_id=registered_user.id,
+        book_id=book_in_db.id,
+        recommendation_score=4,
+    )
+    newer_book_rating = BookRating(
+        user_id=registered_user.id,
+        book_id=second_book.id,
         recommendation_score=5,
     )
-    db_session.add_all([older_user_book, newer_user_book])
-    db_session.commit()
-    db_session.refresh(older_user_book)
-    db_session.refresh(newer_user_book)
 
     older_post = ReadingPost(
-        user_book_id=older_user_book.id,
+        user_id=registered_user.id,
+        book_id=book_in_db.id,
+        recommendation_score=older_book_rating.recommendation_score,
         recommendation_reason="古い公開投稿",
         is_public=True,
         created_at=datetime(2026, 9, 24, tzinfo=timezone.utc),
     )
     newer_post = ReadingPost(
-        user_book_id=newer_user_book.id,
+        user_id=registered_user.id,
+        book_id=second_book.id,
+        recommendation_score=newer_book_rating.recommendation_score,
         recommendation_reason="新しい公開投稿",
         is_public=True,
         created_at=datetime(2026, 9, 25, tzinfo=timezone.utc),
     )
-    db_session.add_all([older_post, newer_post])
+    db_session.add_all(
+        [
+            older_user_book,
+            newer_user_book,
+            older_book_rating,
+            newer_book_rating,
+            older_post,
+            newer_post,
+        ]
+    )
     db_session.commit()
     db_session.refresh(older_post)
     db_session.refresh(newer_post)
@@ -198,6 +223,8 @@ def test_read_user_profile_orders_public_books_by_newest_post(
         db_session.flush()
         db_session.delete(newer_user_book)
         db_session.delete(older_user_book)
+        db_session.delete(newer_book_rating)
+        db_session.delete(older_book_rating)
         db_session.flush()
         db_session.delete(second_book)
         db_session.commit()
