@@ -8,7 +8,8 @@ from sqlalchemy.orm import joinedload
 
 from dependencies import CurrentUserDep, SessionDep
 from enums import BookGenre, ReadingStatus, UserBookListType
-from models import Book, UserBook
+from models import Book, BookRating, UserBook
+from schemas.books import BookResponse
 from schemas.user_books import (
     UserBookCreate,
     UserBookDetailResponse,
@@ -48,7 +49,20 @@ def create_user_book(
         )
     db.refresh(user_book)
 
-    return user_book
+    book_rating_statement = select(BookRating).where(
+        BookRating.user_id == current_user.id, BookRating.book_id == user_book.book_id
+    )
+    book_rating = db.scalar(book_rating_statement)
+
+    return UserBookResponse(
+        id=user_book.id,
+        book_id=user_book.book_id,
+        priority=user_book.priority,
+        status=user_book.status,
+        recommendation_score=(
+            book_rating.recommendation_score if book_rating is not None else None
+        ),
+    )
 
 
 @router.get("", response_model=list[UserBookListItem])
@@ -58,7 +72,12 @@ def read_user_books(
     list_type: UserBookListType = UserBookListType.WANT_TO_READ,
 ):
     statement = (
-        select(UserBook)
+        select(UserBook, BookRating.recommendation_score)
+        .outerjoin(
+            BookRating,
+            (BookRating.book_id == UserBook.book_id)
+            & (BookRating.user_id == UserBook.user_id),
+        )
         .options(joinedload(UserBook.book))
         .where(UserBook.user_id == current_user.id)
     )
@@ -66,8 +85,24 @@ def read_user_books(
         statement = statement.where(UserBook.status == ReadingStatus.COMPLETED)
     else:
         statement = statement.where(UserBook.status != ReadingStatus.COMPLETED)
-    user_books = db.scalars(statement).all()
-    return user_books
+    user_books = db.execute(statement).all()
+
+    response_list = []
+    for user_book, recommendation_score in user_books:
+        book_response = BookResponse.model_validate(
+            user_book.book,
+            from_attributes=True,
+        )
+        user_book_list_item = UserBookListItem(
+            id=user_book.id,
+            priority=user_book.priority,
+            status=user_book.status,
+            book=book_response,
+            recommendation_score=recommendation_score,
+        )
+        response_list.append(user_book_list_item)
+
+    return response_list
 
 
 @router.get("/{book_id}", response_model=UserBookDetailResponse)
@@ -82,6 +117,11 @@ def get_user_book_detail(
             detail="本が見つかりません。",
         )
 
+    book_rating_statement = select(BookRating).where(
+        BookRating.book_id == book_id, BookRating.user_id == current_user.id
+    )
+    book_rating = db.scalar(book_rating_statement)
+
     statement = select(UserBook).where(
         UserBook.user_id == current_user.id, UserBook.book_id == book_id
     )
@@ -93,7 +133,9 @@ def get_user_book_detail(
             is_registered=False,
             priority=None,
             status=None,
-            recommendation_score=None,
+            recommendation_score=(
+                book_rating.recommendation_score if book_rating is not None else None
+            ),
         )
 
     return UserBookDetailResponse(
@@ -101,7 +143,9 @@ def get_user_book_detail(
         is_registered=True,
         priority=user_book.priority,
         status=user_book.status,
-        recommendation_score=user_book.recommendation_score,
+        recommendation_score=(
+            book_rating.recommendation_score if book_rating is not None else None
+        ),
     )
 
 
@@ -127,7 +171,20 @@ def update_user_book_priority(
     db.commit()
     db.refresh(user_book)
 
-    return user_book
+    book_rating_statement = select(BookRating).where(
+        BookRating.book_id == book_id, BookRating.user_id == current_user.id
+    )
+    book_rating = db.scalar(book_rating_statement)
+
+    return UserBookResponse(
+        id=user_book.id,
+        book_id=user_book.book_id,
+        priority=user_book.priority,
+        status=user_book.status,
+        recommendation_score=(
+            book_rating.recommendation_score if book_rating is not None else None
+        ),
+    )
 
 
 @router.delete("/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -140,11 +197,7 @@ def delete_user_book(book_id: int, current_user: CurrentUserDep, db: SessionDep)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="本が見つかりません。"
         )
-    if user_book.reading_post is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="読了投稿を削除してから本を削除してください。",
-        )
+
     db.delete(user_book)
     db.commit()
 
@@ -156,21 +209,15 @@ def update_user_book_status(
     current_user: CurrentUserDep,
     status_data: UserBookStatusUpdate,
 ):
+
     statement = select(UserBook).where(
         UserBook.book_id == book_id, UserBook.user_id == current_user.id
     )
     user_book = db.scalar(statement)
+
     if user_book is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="本が見つかりません"
-        )
-    if (
-        status_data.status != ReadingStatus.COMPLETED
-        and user_book.reading_post is not None
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="読了投稿を削除してから完読状態を変更してください。",
         )
 
     if (
@@ -182,13 +229,37 @@ def update_user_book_status(
             detail="完読にするにはおすすめ度の登録が必要です。",
         )
 
+    book_rating_statement = select(BookRating).where(
+        BookRating.book_id == book_id, BookRating.user_id == current_user.id
+    )
+    book_rating = db.scalar(book_rating_statement)
+
     user_book.status = status_data.status
-    user_book.recommendation_score = status_data.recommendation_score
+
+    if status_data.status == ReadingStatus.COMPLETED and book_rating is None:
+        book_rating = BookRating(
+            user_id=current_user.id,
+            book_id=book_id,
+            recommendation_score=status_data.recommendation_score,
+        )
+        db.add(book_rating)
+    elif status_data.status == ReadingStatus.COMPLETED and book_rating is not None:
+        book_rating.recommendation_score = status_data.recommendation_score
 
     db.commit()
     db.refresh(user_book)
+    if book_rating is not None:
+        db.refresh(book_rating)
 
-    return user_book
+    return UserBookResponse(
+        id=user_book.id,
+        book_id=user_book.book_id,
+        priority=user_book.priority,
+        status=user_book.status,
+        recommendation_score=(
+            book_rating.recommendation_score if book_rating is not None else None
+        ),
+    )
 
 
 @router.patch("/{book_id}/recommendation-score", response_model=UserBookResponse)
@@ -213,12 +284,31 @@ def update_user_book_recommendation_score(
             detail="読書状態が完読でなければ、おすすめ度の変更はできません。",
         )
 
-    user_book.recommendation_score = recommendation_data.recommendation_score
+    book_rating_statement = select(BookRating).where(
+        BookRating.book_id == book_id, BookRating.user_id == current_user.id
+    )
+    book_rating = db.scalar(book_rating_statement)
+
+    if book_rating is None:
+        book_rating = BookRating(
+            user_id=current_user.id,
+            book_id=book_id,
+            recommendation_score=recommendation_data.recommendation_score,
+        )
+        db.add(book_rating)
+    else:
+        book_rating.recommendation_score = recommendation_data.recommendation_score
 
     db.commit()
-    db.refresh(user_book)
+    db.refresh(book_rating)
 
-    return user_book
+    return UserBookResponse(
+        id=user_book.id,
+        book_id=user_book.book_id,
+        priority=user_book.priority,
+        status=user_book.status,
+        recommendation_score=book_rating.recommendation_score,
+    )
 
 
 @router.post(
@@ -303,4 +393,18 @@ def create_user_book_from_search(
         )
 
     db.refresh(user_book)
-    return user_book
+
+    book_rating_statement = select(BookRating).where(
+        BookRating.book_id == user_book.book_id, BookRating.user_id == current_user.id
+    )
+    book_rating = db.scalar(book_rating_statement)
+
+    return UserBookResponse(
+        id=user_book.id,
+        book_id=user_book.book_id,
+        priority=user_book.priority,
+        status=user_book.status,
+        recommendation_score=(
+            book_rating.recommendation_score if book_rating is not None else None
+        ),
+    )

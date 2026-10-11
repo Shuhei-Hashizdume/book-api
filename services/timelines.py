@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from models import Book, Follow, ReadingPost, User, UserBook
+from models import Book, Follow, ReadingPost, User
 from schemas.timelines import TimelinePostResponse
 
 
@@ -13,15 +13,14 @@ def _build_base_timeline_statement():
             Book.id.label("book_id"),
             Book.title,
             Book.cover_image_url,
-            UserBook.recommendation_score,
+            ReadingPost.recommendation_score,
             ReadingPost.recommendation_reason,
             ReadingPost.created_at,
             ReadingPost.id.label("reading_post_id"),
         )
         .select_from(ReadingPost)
-        .join(UserBook, ReadingPost.user_book_id == UserBook.id)
-        .join(Book, UserBook.book_id == Book.id)
-        .join(User, UserBook.user_id == User.id)
+        .join(Book, ReadingPost.book_id == Book.id)
+        .join(User, ReadingPost.user_id == User.id)
     )
     return base_timeline_statement
 

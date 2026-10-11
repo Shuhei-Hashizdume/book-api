@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from enums import ReadingReminderStatus, ReadingStatus
 from main import app
-from models import ReadingReminder, UserBook
+from models import BookRating, ReadingReminder, UserBook
 from services import reading_reminders as reading_reminder_service
 from services.email import EmailSendError
 from services.reading_reminders import (
@@ -170,10 +170,14 @@ def test_set_user_book_reading_reminder_returns_conflict_when_completed(
         user_id=registered_user.id,
         priority=user_book_data["priority"],
         status=ReadingStatus.COMPLETED,
+    )
+    book_rating = BookRating(
+        book_id=user_book_data["book_id"],
+        user_id=registered_user.id,
         recommendation_score=5,
     )
 
-    db_session.add(user_book)
+    db_session.add_all([user_book, book_rating])
     db_session.commit()
     db_session.refresh(user_book)
 

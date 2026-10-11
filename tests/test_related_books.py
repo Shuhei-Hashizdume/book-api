@@ -1,9 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from enums import BookGenre, ReadingPriority, ReadingStatus
+from enums import BookGenre
 from main import app
-from models import Book, UserBook
+from models import Book, BookRating
 
 client = TestClient(app)
 
@@ -29,49 +29,37 @@ def test_read_related_books_returns_book_in_same_genre(
     db_session.refresh(same_genre_book)
     db_session.refresh(different_genre_book)
 
-    same_genre_user_book = UserBook(
+    same_genre_book_rating = BookRating(
         user_id=registered_user.id,
         book_id=same_genre_book.id,
-        priority=ReadingPriority.MEDIUM,
-        status=ReadingStatus.COMPLETED,
         recommendation_score=5,
     )
-    other_user_same_genre_user_book = UserBook(
+    other_user_same_genre_book_rating = BookRating(
         user_id=other_user.id,
         book_id=same_genre_book.id,
-        priority=ReadingPriority.MEDIUM,
-        status=ReadingStatus.COMPLETED,
         recommendation_score=4,
     )
-    third_user_same_genre_user_book = UserBook(
+    third_user_same_genre_book_rating = BookRating(
         user_id=third_user.id,
         book_id=same_genre_book.id,
-        priority=ReadingPriority.MEDIUM,
-        status=ReadingStatus.COMPLETED,
         recommendation_score=4,
     )
 
-    different_genre_user_book = UserBook(
+    different_genre_book_rating = BookRating(
         user_id=registered_user.id,
         book_id=different_genre_book.id,
-        priority=ReadingPriority.MEDIUM,
-        status=ReadingStatus.COMPLETED,
         recommendation_score=4,
     )
 
     db_session.add_all(
         [
-            same_genre_user_book,
-            other_user_same_genre_user_book,
-            third_user_same_genre_user_book,
-            different_genre_user_book,
+            same_genre_book_rating,
+            other_user_same_genre_book_rating,
+            third_user_same_genre_book_rating,
+            different_genre_book_rating,
         ]
     )
     db_session.commit()
-    db_session.refresh(same_genre_user_book)
-    db_session.refresh(other_user_same_genre_user_book)
-    db_session.refresh(third_user_same_genre_user_book)
-    db_session.refresh(different_genre_user_book)
 
     try:
         response = client.get(f"/books/{book_in_db.id}/related")
@@ -86,10 +74,10 @@ def test_read_related_books_returns_book_in_same_genre(
         )
         assert response_data[0]["average_recommendation_score"] == 4.3
     finally:
-        db_session.delete(same_genre_user_book)
-        db_session.delete(other_user_same_genre_user_book)
-        db_session.delete(third_user_same_genre_user_book)
-        db_session.delete(different_genre_user_book)
+        db_session.delete(same_genre_book_rating)
+        db_session.delete(other_user_same_genre_book_rating)
+        db_session.delete(third_user_same_genre_book_rating)
+        db_session.delete(different_genre_book_rating)
         db_session.flush()
 
         db_session.delete(same_genre_book)
@@ -182,21 +170,17 @@ def test_read_related_books_orders_by_average_score_with_unrated_last(
     db_session.refresh(high_score_book)
     db_session.refresh(unrated_book)
 
-    low_score_user_book = UserBook(
+    low_score_book_rating = BookRating(
         user_id=registered_user.id,
         book_id=low_score_book.id,
-        priority=ReadingPriority.MEDIUM,
-        status=ReadingStatus.COMPLETED,
         recommendation_score=2,
     )
-    high_score_user_book = UserBook(
+    high_score_book_rating = BookRating(
         user_id=registered_user.id,
         book_id=high_score_book.id,
-        priority=ReadingPriority.MEDIUM,
-        status=ReadingStatus.COMPLETED,
         recommendation_score=5,
     )
-    db_session.add_all([low_score_user_book, high_score_user_book])
+    db_session.add_all([low_score_book_rating, high_score_book_rating])
     db_session.commit()
 
     try:
@@ -212,8 +196,8 @@ def test_read_related_books_orders_by_average_score_with_unrated_last(
             unrated_book.id,
         ]
     finally:
-        db_session.delete(low_score_user_book)
-        db_session.delete(high_score_user_book)
+        db_session.delete(low_score_book_rating)
+        db_session.delete(high_score_book_rating)
         db_session.flush()
 
         db_session.delete(low_score_book)
