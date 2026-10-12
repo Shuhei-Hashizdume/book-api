@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 
 from database import database_url, get_db
 from main import app
-from models import Book, BookRating, Insight, ReadingPost, User, UserBook
+from models import Book, BookRating, CompletedBook, Insight, ReadingPost, User, UserBook
 from security import create_access_token, hash_password
 
 TEST_DATABASE_URL = database_url.set(database="book_api_test")
@@ -145,6 +145,13 @@ def user_book_data(book_in_db, registered_user):
             delete(BookRating).where(
                 BookRating.book_id == book_in_db.id,
                 BookRating.user_id == registered_user.id,
+            )
+        )
+
+        db.execute(
+            delete(CompletedBook).where(
+                CompletedBook.user_id == registered_user.id,
+                CompletedBook.book_id == book_in_db.id,
             )
         )
 

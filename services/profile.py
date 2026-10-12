@@ -1,8 +1,7 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from enums import ReadingStatus
-from models import Book, Follow, ReadingPost, User, UserBook
+from models import Book, CompletedBook, Follow, ReadingPost, User
 from schemas.profiles import PublicBookshelfBookResponse, UserProfileResponse
 
 
@@ -13,8 +12,8 @@ def get_user_profile(user_id: int, db: Session) -> UserProfileResponse | None:
     if user is None:
         return None
 
-    completed_book_count_statement = select(func.count(UserBook.id)).where(
-        UserBook.user_id == user.id, UserBook.status == ReadingStatus.COMPLETED
+    completed_book_count_statement = select(func.count(CompletedBook.id)).where(
+        CompletedBook.user_id == user_id
     )
     completed_book_count = db.scalar(completed_book_count_statement)
 
