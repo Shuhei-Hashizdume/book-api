@@ -263,3 +263,15 @@ class AISuggestion(Base):
     __table_args__ = (
         UniqueConstraint("insight_id", name="uq_ai_suggestion_insight_id"),
     )
+
+
+class CompletedBook(Base):
+    __tablename__ = "completed_books"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    book_id: Mapped[int] = mapped_column(ForeignKey("books.id"))
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "book_id", name="uq_completed_books_user_id_book_id"
+        ),
+    )

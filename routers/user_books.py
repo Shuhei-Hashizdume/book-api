@@ -8,7 +8,7 @@ from sqlalchemy.orm import joinedload
 
 from dependencies import CurrentUserDep, SessionDep
 from enums import BookGenre, ReadingStatus, UserBookListType
-from models import Book, BookRating, UserBook
+from models import Book, BookRating, CompletedBook, UserBook
 from schemas.book_ratings import BookRatingResponse, BookRatingUpdate
 from schemas.books import BookResponse
 from schemas.user_books import (
@@ -234,6 +234,20 @@ def update_user_book_status(
         BookRating.book_id == book_id, BookRating.user_id == current_user.id
     )
     book_rating = db.scalar(book_rating_statement)
+
+    if status_data.status == ReadingStatus.COMPLETED:
+        completed_book_statement = select(CompletedBook).where(
+            CompletedBook.user_id == current_user.id, CompletedBook.book_id == book_id
+        )
+
+        completed_book = db.scalar(completed_book_statement)
+
+        if completed_book is None:
+            completed_book = CompletedBook(
+                user_id=current_user.id,
+                book_id=book_id,
+            )
+            db.add(completed_book)
 
     user_book.status = status_data.status
 

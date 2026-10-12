@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from enums import ReadingPriority, ReadingStatus
 from main import app
-from models import Book, BookRating, Follow, ReadingPost, UserBook
+from models import Book, BookRating, CompletedBook, Follow, ReadingPost, UserBook
 
 client = TestClient(app)
 
@@ -27,6 +28,10 @@ def test_read_user_profile(registered_user, other_user, book_in_db, db_session):
         book_id=book_in_db.id,
         recommendation_score=5,
     )
+    completed_book = CompletedBook(
+        user_id=registered_user.id,
+        book_id=book_in_db.id,
+    )
 
     reading_post = ReadingPost(
         user_id=registered_user.id,
@@ -39,7 +44,7 @@ def test_read_user_profile(registered_user, other_user, book_in_db, db_session):
         follower_id=other_user.id,
         followed_id=registered_user.id,
     )
-    db_session.add_all([user_book, book_rating, reading_post, follow])
+    db_session.add_all([user_book, book_rating, completed_book, reading_post, follow])
     db_session.commit()
     db_session.refresh(reading_post)
 
@@ -73,6 +78,7 @@ def test_read_user_profile(registered_user, other_user, book_in_db, db_session):
         db_session.flush()
         db_session.delete(user_book)
         db_session.delete(book_rating)
+        db_session.delete(completed_book)
         db_session.delete(follow)
         db_session.commit()
 
@@ -112,6 +118,10 @@ def test_read_user_profile_excludes_private_reading_post(
         book_id=book_in_db.id,
         recommendation_score=5,
     )
+    completed_book = CompletedBook(
+        user_id=registered_user.id,
+        book_id=book_in_db.id,
+    )
 
     reading_post = ReadingPost(
         user_id=registered_user.id,
@@ -120,7 +130,7 @@ def test_read_user_profile_excludes_private_reading_post(
         recommendation_reason="非公開のおすすめ理由",
         is_public=False,
     )
-    db_session.add_all([user_book, book_rating, reading_post])
+    db_session.add_all([user_book, book_rating, completed_book, reading_post])
     db_session.commit()
 
     try:
@@ -135,6 +145,7 @@ def test_read_user_profile_excludes_private_reading_post(
         db_session.flush()
         db_session.delete(user_book)
         db_session.delete(book_rating)
+        db_session.delete(completed_book)
         db_session.commit()
 
 
@@ -172,6 +183,14 @@ def test_read_user_profile_orders_public_books_by_newest_post(
         book_id=second_book.id,
         recommendation_score=5,
     )
+    older_completed_book = CompletedBook(
+        user_id=registered_user.id,
+        book_id=book_in_db.id,
+    )
+    newer_completed_book = CompletedBook(
+        user_id=registered_user.id,
+        book_id=second_book.id,
+    )
 
     older_post = ReadingPost(
         user_id=registered_user.id,
@@ -195,6 +214,8 @@ def test_read_user_profile_orders_public_books_by_newest_post(
             newer_user_book,
             older_book_rating,
             newer_book_rating,
+            older_completed_book,
+            newer_completed_book,
             older_post,
             newer_post,
         ]
@@ -225,6 +246,95 @@ def test_read_user_profile_orders_public_books_by_newest_post(
         db_session.delete(older_user_book)
         db_session.delete(newer_book_rating)
         db_session.delete(older_book_rating)
+        db_session.delete(newer_completed_book)
+        db_session.delete(older_completed_book)
         db_session.flush()
         db_session.delete(second_book)
         db_session.commit()
+
+
+def test_read_user_profile_preserves_completed_count_after_removing_user_book(
+    registered_user, user_book_data, access_token, db_session
+):
+    post_response = client.post(
+        "/users/me/books",
+        json=user_book_data,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert post_response.status_code == 201
+    book_id = post_response.json()["book_id"]
+
+    patch_response = client.patch(
+        f"/users/me/books/{book_id}/status",
+        json={"status": "completed", "recommendation_score": 5},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert patch_response.status_code == 200
+
+    delete_response = client.delete(
+        f"/users/me/books/{book_id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert delete_response.status_code == 204
+
+    get_profile_response = client.get(
+        f"/users/{registered_user.id}/profile",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert get_profile_response.status_code == 200
+    get_profile_response_data = get_profile_response.json()
+    assert get_profile_response_data["completed_book_count"] == 1
+
+    complete_book_statement = select(CompletedBook).where(
+        CompletedBook.user_id == registered_user.id, CompletedBook.book_id == book_id
+    )
+    complete_book = db_session.scalar(complete_book_statement)
+
+    assert complete_book is not None
+
+
+def test_read_user_profile_counts_same_book_only_once(
+    registered_user, user_book_data, access_token, db_session
+):
+    post_response = client.post(
+        "/users/me/books",
+        json=user_book_data,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert post_response.status_code == 201
+    book_id = post_response.json()["book_id"]
+
+    first_completed_response = client.patch(
+        f"/users/me/books/{book_id}/status",
+        json={"status": "completed", "recommendation_score": 5},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert first_completed_response.status_code == 200
+
+    reading_response = client.patch(
+        f"/users/me/books/{book_id}/status",
+        json={"status": "reading"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert reading_response.status_code == 200
+
+    second_completed_response = client.patch(
+        f"/users/me/books/{book_id}/status",
+        json={"status": "completed", "recommendation_score": 4},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert second_completed_response.status_code == 200
+
+    profile_response = client.get(f"/users/{registered_user.id}/profile")
+    assert profile_response.status_code == 200
+    assert profile_response.json()["completed_book_count"] == 1
+
+    statement = select(CompletedBook).where(
+        CompletedBook.user_id == registered_user.id,
+        CompletedBook.book_id == book_id,
+    )
+    completed_books = db_session.scalars(statement).all()
+    assert len(completed_books) == 1
