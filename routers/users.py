@@ -36,6 +36,13 @@ def create_user(user_data: UserCreate, db: SessionDep):
     return new_user
 
 
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(current_user: CurrentUserDep, db: SessionDep):
+
+    db.delete(current_user)
+    db.commit()
+
+
 @router.post("/login", response_model=LoginResponse)
 def login_user(user_login: UserLogin, db: SessionDep):
     statement = select(User).where(User.email == user_login.email)

@@ -98,7 +98,9 @@ class User(Base):
 class UserBook(Base):
     __tablename__ = "user_books"
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
     book_id: Mapped[int] = mapped_column(ForeignKey("books.id"), nullable=False)
     book: Mapped[Book] = relationship()
 
@@ -125,7 +127,9 @@ class UserBook(Base):
 class Insight(Base):
     __tablename__ = "insights"
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
     book_id: Mapped[int] = mapped_column(ForeignKey("books.id"), nullable=False)
     book: Mapped[Book] = relationship()
     content: Mapped[str] = mapped_column(Text, nullable=False)
