@@ -8,14 +8,14 @@ from models import Book, BookRating
 client = TestClient(app)
 
 
-def test_read_books():
+def test_list_books():
     response = client.get("/books")
 
     assert response.status_code == 200
     assert response.json() == []
 
 
-def test_read_books_returns_books(book_in_db):
+def test_list_books_returns_books(book_in_db):
     response = client.get("/books")
 
     assert response.status_code == 200
@@ -29,7 +29,7 @@ def test_read_books_returns_books(book_in_db):
     ]
 
 
-def test_read_book_returns_detail_without_recommendation_score(book_in_db):
+def test_get_book_detail_returns_detail_without_recommendation_score(book_in_db):
     response = client.get(f"/books/{book_in_db.id}")
 
     assert response.status_code == 200
@@ -43,7 +43,7 @@ def test_read_book_returns_detail_without_recommendation_score(book_in_db):
     }
 
 
-def test_read_book_returns_cover_image_url(db_session):
+def test_get_book_detail_returns_cover_image_url(db_session):
     book = Book(
         title="表紙画像のある本",
         author="テスト著者",
@@ -71,7 +71,7 @@ def test_read_book_returns_cover_image_url(db_session):
         db_session.commit()
 
 
-def test_read_book_returns_average_recommendation_score(
+def test_get_book_detail_returns_average_recommendation_score(
     user_book_data,
     registered_user,
     other_user,
@@ -112,14 +112,14 @@ def test_read_book_returns_average_recommendation_score(
         db_session.commit()
 
 
-def test_read_book_not_found():
+def test_get_book_detail_not_found():
     response = client.get("/books/999999")
 
     assert response.status_code == 404
 
 
 @pytest.mark.parametrize("book_id", ["abc", "0", "-1"])
-def test_read_book_rejects_invalid_book_id(book_id):
+def test_get_book_detail_rejects_invalid_book_id(book_id):
     response = client.get(f"/books/{book_id}")
 
     assert response.status_code == 422

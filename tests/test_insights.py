@@ -190,7 +190,7 @@ def test_create_insight_unauthorized_without_token(book_in_db):
     assert response.status_code == 401
 
 
-def test_read_insights_returns_multiple_insights_in_creation_order(
+def test_list_insights_returns_multiple_insights_in_creation_order(
     user_book_data, access_token, book_in_db
 ):
     user_book_response = client.post(
@@ -232,7 +232,7 @@ def test_read_insights_returns_multiple_insights_in_creation_order(
     assert response_data[1]["book_title"] == book_in_db.title
 
 
-def test_read_insights_returns_empty_list(user_book_data, access_token):
+def test_list_insights_returns_empty_list(user_book_data, access_token):
     user_book_response = client.post(
         "/users/me/books",
         json=user_book_data,
@@ -251,7 +251,7 @@ def test_read_insights_returns_empty_list(user_book_data, access_token):
     assert response.json() == []
 
 
-def test_read_insights_returns_empty_list_without_user_book(book_in_db, access_token):
+def test_list_insights_returns_empty_list_without_user_book(book_in_db, access_token):
     response = client.get(
         f"/users/me/books/{book_in_db.id}/insights",
         headers={"Authorization": f"Bearer {access_token}"},
@@ -261,7 +261,7 @@ def test_read_insights_returns_empty_list_without_user_book(book_in_db, access_t
     assert response.json() == []
 
 
-def test_read_insights_unauthorized_without_token(book_in_db):
+def test_list_insights_unauthorized_without_token(book_in_db):
     response = client.get(f"/users/me/books/{book_in_db.id}/insights")
 
     assert response.status_code == 401

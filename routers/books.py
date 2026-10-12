@@ -56,7 +56,7 @@ def search_books(
 
 
 @router.get("/{book_id}", response_model=BookDetailResponse)
-def read_book(book_id: Annotated[int, Path(gt=0)], db: SessionDep):
+def get_book_detail(book_id: Annotated[int, Path(gt=0)], db: SessionDep):
     book_detail = get_book_with_average_score(book_id, db)
     if book_detail is None:
         raise HTTPException(
@@ -66,7 +66,7 @@ def read_book(book_id: Annotated[int, Path(gt=0)], db: SessionDep):
 
 
 @router.get("", response_model=list[BookResponse])
-def read_books(db: SessionDep):
+def list_books(db: SessionDep):
     statement = select(Book)
     result = db.scalars(statement).all()
     return result
@@ -128,7 +128,7 @@ def delete_book(book_id: int, db: SessionDep, admin_user: AdminUserDep):
 
 
 @router.get("/{book_id}/related", response_model=list[RelatedBookResponse])
-def read_related_books(book_id: Annotated[int, Path(gt=0)], db: SessionDep):
+def list_related_books(book_id: Annotated[int, Path(gt=0)], db: SessionDep):
     related_books = get_related_books(book_id, db)
 
     if related_books is None:

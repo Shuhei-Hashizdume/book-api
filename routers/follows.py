@@ -84,7 +84,7 @@ def delete_follow(followed_user_id: int, current_user: CurrentUserDep, db: Sessi
 
 
 @router.get("/me/following", response_model=list[ShowFollowResponse])
-def read_following_users(current_user: CurrentUserDep, db: SessionDep):
+def list_following_users(current_user: CurrentUserDep, db: SessionDep):
     statement = (
         select(User)
         .join(Follow, Follow.followed_id == User.id)
@@ -96,7 +96,7 @@ def read_following_users(current_user: CurrentUserDep, db: SessionDep):
 
 
 @router.get("/me/followers", response_model=list[ShowFollowResponse])
-def read_follower_users(current_user: CurrentUserDep, db: SessionDep):
+def list_follower_users(current_user: CurrentUserDep, db: SessionDep):
     statement = (
         select(User)
         .join(Follow, Follow.follower_id == User.id)

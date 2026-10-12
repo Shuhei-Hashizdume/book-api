@@ -14,7 +14,7 @@ router = APIRouter(prefix="/users/me/books", tags=["insights"])
     response_model=InsightResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def create_insights(
+def create_insight(
     book_id: int,
     insights_data: InsightCreate,
     db: SessionDep,
@@ -49,7 +49,7 @@ def create_insights(
 
 
 @router.get("/{book_id}/insights", response_model=list[InsightResponse])
-def read_insights(book_id: int, current_user: CurrentUserDep, db: SessionDep):
+def list_insights(book_id: int, current_user: CurrentUserDep, db: SessionDep):
     insight_statement = (
         select(Insight)
         .options(joinedload(Insight.book))

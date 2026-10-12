@@ -8,7 +8,7 @@ from models import Book, BookRating, Follow, ReadingPost
 client = TestClient(app)
 
 
-def test_read_recommended_timeline(registered_user, book_in_db, db_session):
+def test_list_recommended_timeline(registered_user, book_in_db, db_session):
     book = db_session.get(Book, book_in_db.id)
     assert book is not None
     book.cover_image_url = "https://example.com/recommended-book-cover.jpg"
@@ -178,7 +178,7 @@ def test_recommended_timeline_returns_empty_list_without_posts():
     assert response.json() == []
 
 
-def test_read_following_timeline(
+def test_list_following_timeline(
     registered_user, other_user, book_in_db, db_session, access_token
 ):
     book = db_session.get(Book, book_in_db.id)
