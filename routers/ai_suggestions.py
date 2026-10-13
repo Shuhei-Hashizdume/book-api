@@ -41,7 +41,7 @@ def generate_ai_suggestion(
     except AISuggestionGenerationError:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="外部サーバーとの通信に失敗しました。",
+            detail="AI提案を生成できませんでした。再度お試しください。",
         )
     except AISuggestionSaveError:
         raise HTTPException(

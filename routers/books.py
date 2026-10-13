@@ -115,7 +115,7 @@ def update_book(
     target_book = db.get(Book, book_id)
     if target_book is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="本がありません。"
+            status_code=status.HTTP_404_NOT_FOUND, detail="本が見つかりません。"
         )
     update_data = book_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -139,7 +139,7 @@ def delete_book(
     target_book = db.get(Book, book_id)
     if target_book is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="本がありません。"
+            status_code=status.HTTP_404_NOT_FOUND, detail="本が見つかりません。"
         )
     db.delete(target_book)
     try:

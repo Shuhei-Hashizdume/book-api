@@ -113,7 +113,7 @@ def get_reading_post(
 
     if reading_post is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="読了投稿がありません。"
+            status_code=status.HTTP_404_NOT_FOUND, detail="読了投稿が見つかりません。"
         )
 
     return _build_reading_post_response(reading_post)
@@ -133,7 +133,7 @@ def update_reading_post(
 
     if reading_post is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="読了投稿がありません。"
+            status_code=status.HTTP_404_NOT_FOUND, detail="読了投稿が見つかりません。"
         )
 
     reading_post.recommendation_reason = update_reading_post_data.recommendation_reason
@@ -156,7 +156,7 @@ def delete_reading_post(
 
     if reading_post is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="読了投稿がありません。"
+            status_code=status.HTTP_404_NOT_FOUND, detail="読了投稿が見つかりません。"
         )
 
     db.delete(reading_post)
@@ -177,7 +177,7 @@ def update_reading_post_visibility(
 
     if reading_post is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="読了投稿がありません。"
+            status_code=status.HTTP_404_NOT_FOUND, detail="読了投稿が見つかりません。"
         )
 
     reading_post.is_public = reading_post_visibility_data.is_public
