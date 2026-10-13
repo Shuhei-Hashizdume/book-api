@@ -369,7 +369,7 @@ def test_different_users_can_follow_same_user(
     }
 
 
-def test_read_following_users(access_token, other_user, third_user):
+def test_list_following_users(access_token, other_user, third_user):
 
     first_following_user_response = client.post(
         f"/users/{other_user.id}/follow",
@@ -395,7 +395,7 @@ def test_read_following_users(access_token, other_user, third_user):
     }
 
 
-def test_read_following_users_returns_empty_list(access_token):
+def test_list_following_users_returns_empty_list(access_token):
     response = client.get(
         "/users/me/following", headers={"Authorization": f"Bearer {access_token}"}
     )
@@ -405,13 +405,13 @@ def test_read_following_users_returns_empty_list(access_token):
     assert response_data == []
 
 
-def test_read_following_users_returns_without_access_token_error():
+def test_list_following_users_returns_without_access_token_error():
     response = client.get("/users/me/following")
 
     assert response.status_code == 401
 
 
-def test_read_following_users_excludes_other_users_following(
+def test_list_following_users_excludes_other_users_following(
     access_token, registered_user, other_access_token, third_user
 ):
     create_own_follow_response = client.post(
@@ -435,7 +435,7 @@ def test_read_following_users_excludes_other_users_following(
     assert response.json() == [{"id": third_user.id, "username": third_user.username}]
 
 
-def test_read_follower_users(
+def test_list_follower_users(
     access_token, other_access_token, other_user, third_user, registered_user
 ):
     third_access_token = create_access_token(third_user.id)
@@ -466,13 +466,13 @@ def test_read_follower_users(
     }
 
 
-def test_read_follower_users_returns_without_access_token_error():
+def test_list_follower_users_returns_without_access_token_error():
     response = client.get("/users/me/followers")
 
     assert response.status_code == 401
 
 
-def test_read_follower_users_excludes_other_users_followers(
+def test_list_follower_users_excludes_other_users_followers(
     access_token, registered_user, other_user, other_access_token, third_user
 ):
     create_own_follower_response = client.post(
@@ -498,7 +498,7 @@ def test_read_follower_users_excludes_other_users_followers(
     ]
 
 
-def test_read_follower_users_returns_empty_list(access_token):
+def test_list_follower_users_returns_empty_list(access_token):
     response = client.get(
         "/users/me/followers",
         headers={"Authorization": f"Bearer {access_token}"},

@@ -8,7 +8,7 @@ from models import Book, BookRating
 client = TestClient(app)
 
 
-def test_read_related_books_returns_book_in_same_genre(
+def test_list_related_books_returns_book_in_same_genre(
     book_in_db, registered_user, other_user, third_user, db_session
 ):
     same_genre_book = Book(
@@ -85,7 +85,7 @@ def test_read_related_books_returns_book_in_same_genre(
         db_session.commit()
 
 
-def test_read_related_books_returns_book_without_rating(book_in_db, db_session):
+def test_list_related_books_returns_book_without_rating(book_in_db, db_session):
     same_genre_book = Book(
         title="テストA",
         author="著者A",
@@ -110,20 +110,20 @@ def test_read_related_books_returns_book_without_rating(book_in_db, db_session):
         db_session.commit()
 
 
-def test_read_related_books_returns_empty_list_when_no_related_books(book_in_db):
+def test_list_related_books_returns_empty_list_when_no_related_books(book_in_db):
     response = client.get(f"/books/{book_in_db.id}/related")
     assert response.status_code == 200
     assert response.json() == []
 
 
-def test_read_related_books_returns_not_found_for_missing_book():
+def test_list_related_books_returns_not_found_for_missing_book():
     response = client.get("/books/999999/related")
     assert response.status_code == 404
     response_data = response.json()
     assert response_data["detail"] == "本が見つかりません。"
 
 
-def test_read_related_books_returns_at_most_four_books(book_in_db, db_session):
+def test_list_related_books_returns_at_most_four_books(book_in_db, db_session):
     related_books = [
         Book(
             title=f"関連書籍{index}",
@@ -146,7 +146,7 @@ def test_read_related_books_returns_at_most_four_books(book_in_db, db_session):
         db_session.commit()
 
 
-def test_read_related_books_orders_by_average_score_with_unrated_last(
+def test_list_related_books_orders_by_average_score_with_unrated_last(
     book_in_db, registered_user, db_session
 ):
     low_score_book = Book(
@@ -207,6 +207,6 @@ def test_read_related_books_orders_by_average_score_with_unrated_last(
 
 
 @pytest.mark.parametrize("book_id", [0, -1])
-def test_read_related_books_rejects_non_positive_book_id(book_id):
+def test_list_related_books_rejects_non_positive_book_id(book_id):
     response = client.get(f"/books/{book_id}/related")
     assert response.status_code == 422

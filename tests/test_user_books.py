@@ -12,7 +12,7 @@ from schemas.books import BookSearchResult
 client = TestClient(app)
 
 
-def test_create_user_book(user_book_data, access_token, db_session, registered_user):
+def test_add_book_to_user_list(user_book_data, access_token, db_session, registered_user):
     response = client.post(
         "/users/me/books",
         json=user_book_data,
@@ -54,7 +54,7 @@ def test_create_user_book(user_book_data, access_token, db_session, registered_u
     assert book_rating is None
 
 
-def test_create_user_book_preserves_rating_after_reregistration(
+def test_add_book_to_user_list_preserves_rating_after_reregistration(
     user_book_data, registered_user, access_token, db_session
 ):
     create_response = client.post(
@@ -106,7 +106,7 @@ def test_create_user_book_preserves_rating_after_reregistration(
     assert book_ratings[0].recommendation_score == 5
 
 
-def test_create_user_book_conflict_with_duplicate_book(user_book_data, access_token):
+def test_add_book_to_user_list_conflict_with_duplicate_book(user_book_data, access_token):
     response = client.post(
         "/users/me/books",
         json=user_book_data,
@@ -124,7 +124,7 @@ def test_create_user_book_conflict_with_duplicate_book(user_book_data, access_to
     assert second_response.status_code == 409
 
 
-def test_create_user_book_not_found(access_token):
+def test_add_book_to_user_list_not_found(access_token):
     response = client.post(
         "/users/me/books",
         json={"book_id": 0, "priority": "high"},
@@ -134,13 +134,13 @@ def test_create_user_book_not_found(access_token):
     assert response.status_code == 404
 
 
-def test_create_user_book_unauthorized_without_token(user_book_data):
+def test_add_book_to_user_list_unauthorized_without_token(user_book_data):
     response = client.post("/users/me/books", json=user_book_data)
 
     assert response.status_code == 401
 
 
-def test_create_user_book_rejects_invalid_priority(user_book_data, access_token):
+def test_add_book_to_user_list_rejects_invalid_priority(user_book_data, access_token):
     response = client.post(
         "/users/me/books",
         json={"book_id": user_book_data["book_id"], "priority": "urgent"},
@@ -150,7 +150,7 @@ def test_create_user_book_rejects_invalid_priority(user_book_data, access_token)
     assert response.status_code == 422
 
 
-def test_read_user_books(user_book_data, access_token, book_in_db, db_session):
+def test_list_user_books(user_book_data, access_token, book_in_db, db_session):
     book = db_session.get(Book, book_in_db.id)
     assert book is not None
     book.cover_image_url = "https://example.com/my-bookshelf-cover.jpg"
@@ -187,7 +187,7 @@ def test_read_user_books(user_book_data, access_token, book_in_db, db_session):
     "list_type",
     [None, "want_to_read", "completed"],
 )
-def test_read_user_books_filters_by_list_type_and_current_user(
+def test_list_user_books_filters_by_list_type_and_current_user(
     list_type, access_token, registered_user, other_user, db_session
 ):
     unread_book = Book(title="未読の本", author="テスト著者")
@@ -416,7 +416,7 @@ def test_update_user_book_priority(access_token, db_session, user_book_data):
     target_book_id = post_response.json()["book_id"]
 
     patch_response = client.patch(
-        f"/users/me/books/{target_book_id}",
+        f"/users/me/books/{target_book_id}/priority",
         json={"priority": "medium"},
         headers={"Authorization": f"Bearer {access_token}"},
     )
@@ -436,7 +436,7 @@ def test_update_user_book_priority(access_token, db_session, user_book_data):
 
 def test_update_user_book_priority_not_found(book_in_db, access_token, db_session):
     response = client.patch(
-        f"/users/me/books/{book_in_db.id}",
+        f"/users/me/books/{book_in_db.id}/priority",
         json={"priority": "medium"},
         headers={"Authorization": f"Bearer {access_token}"},
     )
@@ -605,158 +605,8 @@ def test_user_book_status_to_completed_with_recommendation_score(
     assert user_book.status.value == "completed"
 
 
-def test_update_user_book_recommendation_score(
-    user_book_data, access_token, db_session, registered_user
-):
-    post_response = client.post(
-        "/users/me/books",
-        json=user_book_data,
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-
-    assert post_response.status_code == 201
-
-    post_response_data = post_response.json()
-    target_book_id = post_response_data["book_id"]
-
-    status_patch_response = client.patch(
-        f"/users/me/books/{target_book_id}/status",
-        json={"status": "completed", "recommendation_score": 5},
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-
-    assert status_patch_response.status_code == 200
-    status_patch_response_data = status_patch_response.json()
-    assert status_patch_response_data["status"] == "completed"
-    assert post_response_data["id"] == status_patch_response_data["id"]
-
-    patch_response = client.patch(
-        f"/users/me/books/{target_book_id}/recommendation-score",
-        json={"recommendation_score": 4},
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-
-    assert patch_response.status_code == 200
-    patch_response_data = patch_response.json()
-    assert patch_response_data["recommendation_score"] == 4
-    assert status_patch_response_data["id"] == patch_response_data["id"]
-    assert patch_response_data["status"] == "completed"
-
-    book_rating = db_session.scalar(
-        select(BookRating).where(
-            BookRating.book_id == target_book_id,
-            BookRating.user_id == registered_user.id,
-        )
-    )
-    assert book_rating is not None
-    assert book_rating.recommendation_score == 4
-
-    user_book = db_session.get(UserBook, patch_response_data["id"])
-    assert user_book is not None
-    assert user_book.status.value == "completed"
-
-
-def test_update_user_book_recommendation_score_before_completed(
-    user_book_data, access_token, db_session, registered_user
-):
-    post_response = client.post(
-        "/users/me/books",
-        json=user_book_data,
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-
-    assert post_response.status_code == 201
-    post_response_data = post_response.json()
-    target_book_id = post_response_data["book_id"]
-
-    patch_response = client.patch(
-        f"/users/me/books/{target_book_id}/recommendation-score",
-        json={"recommendation_score": 5},
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-
-    assert patch_response.status_code == 409
-
-    user_book = db_session.get(UserBook, post_response_data["id"])
-    assert user_book is not None
-    assert user_book.status.value == "want_to_read"
-
-    book_rating = db_session.scalar(
-        select(BookRating).where(
-            BookRating.book_id == target_book_id,
-            BookRating.user_id == registered_user.id,
-        )
-    )
-    assert book_rating is None
-
-
-@pytest.mark.parametrize("recommendation_score", [0, 6])
-def test_update_user_book_recommendation_score_with_outrange(
-    user_book_data, access_token, db_session, recommendation_score, registered_user
-):
-    post_response = client.post(
-        "/users/me/books",
-        json=user_book_data,
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-
-    assert post_response.status_code == 201
-
-    post_response_data = post_response.json()
-    target_book_id = post_response_data["book_id"]
-
-    status_patch_response = client.patch(
-        f"/users/me/books/{target_book_id}/status",
-        json={"status": "completed", "recommendation_score": 5},
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-
-    assert status_patch_response.status_code == 200
-    status_patch_response_data = status_patch_response.json()
-    assert status_patch_response_data["status"] == "completed"
-    assert post_response_data["id"] == status_patch_response_data["id"]
-
-    patch_response = client.patch(
-        f"/users/me/books/{target_book_id}/recommendation-score",
-        json={"recommendation_score": recommendation_score},
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-    assert patch_response.status_code == 422
-
-    user_book = db_session.get(UserBook, status_patch_response_data["id"])
-    assert user_book is not None
-
-    book_rating = db_session.scalar(
-        select(BookRating).where(
-            BookRating.book_id == target_book_id,
-            BookRating.user_id == registered_user.id,
-        )
-    )
-    assert book_rating is not None
-    assert book_rating.recommendation_score == 5
-
-
-def test_update_user_book_recommendation_score_not_found(book_in_db, access_token):
-    patch_response = client.patch(
-        f"/users/me/books/{book_in_db.id}/recommendation-score",
-        json={"recommendation_score": 5},
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-
-    assert patch_response.status_code == 404
-
-
-def test_update_user_book_recommendation_score_unauthorized(book_in_db):
-    patch_response = client.patch(
-        f"/users/me/books/{book_in_db.id}/recommendation-score",
-        json={"recommendation_score": 5},
-    )
-
-    assert patch_response.status_code == 401
-
-
 @pytest.mark.parametrize("isbn", ["9780000000011", None])
-def test_create_user_book_from_search_creates_book_and_user_book(
+def test_add_book_to_user_list_from_search_creates_book_and_user_book(
     monkeypatch,
     access_token,
     db_session,
@@ -842,7 +692,7 @@ def test_create_user_book_from_search_creates_book_and_user_book(
 @pytest.mark.parametrize(
     "existing_external_id", [None, "existing-book-id", "saved-google-id"]
 )
-def test_create_user_book_from_search_reuses_existing_book(
+def test_add_book_to_user_list_from_search_reuses_existing_book(
     monkeypatch,
     access_token,
     db_session,
@@ -919,7 +769,7 @@ def test_create_user_book_from_search_reuses_existing_book(
     db_session.commit()
 
 
-def test_create_user_book_from_search_preserves_existing_cover_image_url(
+def test_add_book_to_user_list_from_search_preserves_existing_cover_image_url(
     monkeypatch,
     access_token,
     db_session,
@@ -979,7 +829,7 @@ def test_create_user_book_from_search_preserves_existing_cover_image_url(
     db_session.commit()
 
 
-def test_create_user_book_from_search_preserves_existing_genre(
+def test_add_book_to_user_list_from_search_preserves_existing_genre(
     monkeypatch,
     access_token,
     db_session,
@@ -1040,7 +890,7 @@ def test_create_user_book_from_search_preserves_existing_genre(
 
 
 @pytest.mark.parametrize("isbn", ["9780000000013", None])
-def test_create_user_book_from_search_returns_conflict_for_duplicate(
+def test_add_book_to_user_list_from_search_returns_conflict_for_duplicate(
     monkeypatch,
     access_token,
     db_session,
@@ -1112,7 +962,7 @@ def test_create_user_book_from_search_returns_conflict_for_duplicate(
     db_session.commit()
 
 
-def test_create_user_book_from_search_unauthorized_without_token():
+def test_add_book_to_user_list_from_search_unauthorized_without_token():
     response = client.post(
         "/users/me/books/from-search",
         json={
@@ -1141,7 +991,7 @@ def test_create_user_book_from_search_unauthorized_without_token():
         },
     ],
 )
-def test_create_user_book_from_search_rejects_invalid_request(
+def test_add_book_to_user_list_from_search_rejects_invalid_request(
     request_data,
     access_token,
 ):
@@ -1154,7 +1004,7 @@ def test_create_user_book_from_search_rejects_invalid_request(
     assert response.status_code == 422
 
 
-def test_create_user_book_from_search_rejects_incomplete_google_book(
+def test_add_book_to_user_list_from_search_rejects_incomplete_google_book(
     monkeypatch,
     access_token,
 ):
@@ -1182,7 +1032,7 @@ def test_create_user_book_from_search_rejects_incomplete_google_book(
     }
 
 
-def test_create_user_book_from_search_returns_not_found_for_missing_google_book(
+def test_add_book_to_user_list_from_search_returns_not_found_for_missing_google_book(
     monkeypatch,
     access_token,
 ):
@@ -1223,7 +1073,7 @@ def test_create_user_book_from_search_returns_not_found_for_missing_google_book(
     assert response.json() == {"detail": "選択した本がGoogle Booksに存在しません。"}
 
 
-def test_create_user_book_from_search_returns_bad_gateway_for_google_error(
+def test_add_book_to_user_list_from_search_returns_bad_gateway_for_google_error(
     monkeypatch,
     access_token,
 ):
@@ -1266,7 +1116,7 @@ def test_create_user_book_from_search_returns_bad_gateway_for_google_error(
     }
 
 
-def test_create_user_book_from_search_returns_bad_gateway_for_connection_error(
+def test_add_book_to_user_list_from_search_returns_bad_gateway_for_connection_error(
     monkeypatch,
     access_token,
 ):
@@ -1301,7 +1151,7 @@ def test_create_user_book_from_search_returns_bad_gateway_for_connection_error(
     assert response.json() == {"detail": "書籍検索サービスへ接続できませんでした。"}
 
 
-def test_create_user_book_from_search_returns_gateway_timeout(
+def test_add_book_to_user_list_from_search_returns_gateway_timeout(
     monkeypatch,
     access_token,
 ):
@@ -1455,7 +1305,7 @@ def test_delete_user_book_preserves_rating_and_reading_post(
 
 
 @pytest.mark.parametrize("incoming_isbn", [None, "9780000000020"])
-def test_create_user_book_from_search_reuses_external_id_before_isbn(
+def test_add_book_to_user_list_from_search_reuses_external_id_before_isbn(
     monkeypatch,
     access_token,
     other_access_token,

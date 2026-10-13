@@ -16,7 +16,6 @@ from schemas.user_books import (
     UserBookDetailResponse,
     UserBookFromSearchCreate,
     UserBookListItem,
-    UserBookRecommendationScoreUpdate,
     UserBookResponse,
     UserBookStatusUpdate,
     UserBookUpdate,
@@ -28,7 +27,7 @@ router = APIRouter(prefix="/users/me/books", tags=["user-books"])
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=UserBookResponse)
-def create_user_book(
+def add_book_to_user_list(
     user_book_data: UserBookCreate, db: SessionDep, current_user: CurrentUserDep
 ):
     book = db.get(Book, user_book_data.book_id)
@@ -67,7 +66,7 @@ def create_user_book(
 
 
 @router.get("", response_model=list[UserBookListItem])
-def read_user_books(
+def list_user_books(
     db: SessionDep,
     current_user: CurrentUserDep,
     list_type: UserBookListType = UserBookListType.WANT_TO_READ,
@@ -150,7 +149,7 @@ def get_user_book_detail(
     )
 
 
-@router.patch("/{book_id}", response_model=UserBookResponse)
+@router.patch("/{book_id}/priority", response_model=UserBookResponse)
 def update_user_book_priority(
     db: SessionDep,
     current_user: CurrentUserDep,
@@ -277,59 +276,10 @@ def update_user_book_status(
     )
 
 
-@router.patch("/{book_id}/recommendation-score", response_model=UserBookResponse)
-def update_user_book_recommendation_score(
-    recommendation_data: UserBookRecommendationScoreUpdate,
-    book_id: int,
-    db: SessionDep,
-    current_user: CurrentUserDep,
-):
-    statement = select(UserBook).where(
-        UserBook.book_id == book_id, UserBook.user_id == current_user.id
-    )
-    user_book = db.scalar(statement)
-
-    if user_book is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="本が見つかりません。"
-        )
-    if user_book.status != ReadingStatus.COMPLETED:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="読書状態が完読でなければ、おすすめ度の変更はできません。",
-        )
-
-    book_rating_statement = select(BookRating).where(
-        BookRating.book_id == book_id, BookRating.user_id == current_user.id
-    )
-    book_rating = db.scalar(book_rating_statement)
-
-    if book_rating is None:
-        book_rating = BookRating(
-            user_id=current_user.id,
-            book_id=book_id,
-            recommendation_score=recommendation_data.recommendation_score,
-        )
-        db.add(book_rating)
-    else:
-        book_rating.recommendation_score = recommendation_data.recommendation_score
-
-    db.commit()
-    db.refresh(book_rating)
-
-    return UserBookResponse(
-        id=user_book.id,
-        book_id=user_book.book_id,
-        priority=user_book.priority,
-        status=user_book.status,
-        recommendation_score=book_rating.recommendation_score,
-    )
-
-
 @router.post(
     "/from-search", status_code=status.HTTP_201_CREATED, response_model=UserBookResponse
 )
-def create_user_book_from_search(
+def add_book_to_user_list_from_search(
     user_book_data: UserBookFromSearchCreate,
     db: SessionDep,
     current_user: CurrentUserDep,
@@ -442,7 +392,7 @@ def update_book_rating(
     if book_rating is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="この本の読書ステータスが完読でない為,おすすめ度が登録されていません。",
+            detail="この本へのおすすめ度が登録されていません。",
         )
 
     book_rating.recommendation_score = book_rating_data.recommendation_score

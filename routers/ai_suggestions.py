@@ -10,19 +10,19 @@ from services.ai_suggestion import (
     AISuggestionSaveError,
     InsightNotFoundError,
     create_or_update_ai_suggestion,
-    delete_ai_suggestion,
-    get_ai_suggestion,
+    delete_ai_suggestion as delete_ai_suggestion_service,
+    get_ai_suggestion as get_ai_suggestion_service,
 )
 
-router = APIRouter(prefix="/users/me/books", tags=["ai_suggestion"])
+router = APIRouter(prefix="/users/me/books", tags=["ai-suggestions"])
 
 
 @router.post(
-    "/{book_id}/insights/{insight_id}/ai_suggestion",
+    "/{book_id}/insights/{insight_id}/ai-suggestion",
     response_model=AISuggestionResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def set_users_ai_suggestion(
+def generate_ai_suggestion(
     book_id: Annotated[int, Path(gt=0)],
     insight_id: Annotated[int, Path(gt=0)],
     current_user: CurrentUserDep,
@@ -56,17 +56,17 @@ def set_users_ai_suggestion(
 
 
 @router.get(
-    "/{book_id}/insights/{insight_id}/ai_suggestion",
+    "/{book_id}/insights/{insight_id}/ai-suggestion",
     response_model=AISuggestionResponse,
 )
-def read_users_ai_suggestion(
+def get_ai_suggestion(
     book_id: Annotated[int, Path(gt=0)],
     insight_id: Annotated[int, Path(gt=0)],
     current_user: CurrentUserDep,
     db: SessionDep,
 ):
     try:
-        ai_suggestion = get_ai_suggestion(book_id, insight_id, current_user.id, db)
+        ai_suggestion = get_ai_suggestion_service(book_id, insight_id, current_user.id, db)
     except AISuggestionNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="AI提案が保存されていません。"
@@ -76,17 +76,17 @@ def read_users_ai_suggestion(
 
 
 @router.delete(
-    "/{book_id}/insights/{insight_id}/ai_suggestion",
+    "/{book_id}/insights/{insight_id}/ai-suggestion",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-def delete_users_ai_suggestion(
+def delete_ai_suggestion(
     book_id: Annotated[int, Path(gt=0)],
     insight_id: Annotated[int, Path(gt=0)],
     current_user: CurrentUserDep,
     db: SessionDep,
 ):
     try:
-        delete_ai_suggestion(book_id, insight_id, current_user.id, db)
+        delete_ai_suggestion_service(book_id, insight_id, current_user.id, db)
     except AISuggestionNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="AI提案が保存されていません。"

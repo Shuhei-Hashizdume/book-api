@@ -218,7 +218,7 @@ def test_get_reading_post_preserves_original_recommendation_score_after_rerating
     assert create_response.json()["recommendation_score"] == 5
 
     score_response = client.patch(
-        f"/users/me/books/{target_book_id}/recommendation-score",
+        f"/users/me/books/{target_book_id}/book-rating",
         json={"recommendation_score": 3},
         headers={"Authorization": f"Bearer {access_token}"},
     )

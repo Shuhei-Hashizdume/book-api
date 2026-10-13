@@ -15,7 +15,7 @@ from services import ai_suggestion as ai_suggestion_service
 client = TestClient(app)
 
 
-def test_set_ai_suggestion(user_book_data, access_token, db_session, monkeypatch):
+def test_generate_ai_suggestion(user_book_data, access_token, db_session, monkeypatch):
     create_user_book_response = client.post(
         "/users/me/books",
         json=user_book_data,
@@ -49,7 +49,7 @@ def test_set_ai_suggestion(user_book_data, access_token, db_session, monkeypatch
     )
 
     response = client.post(
-        f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion",
+        f"/users/me/books/{book_id}/insights/{insight_id}/ai-suggestion",
         headers={"Authorization": f"Bearer {access_token}"},
     )
     assert response.status_code == 201
@@ -70,7 +70,7 @@ def test_set_ai_suggestion(user_book_data, access_token, db_session, monkeypatch
     assert ai_suggestion.next_action == "テストD"
 
 
-def test_set_ai_suggestion_after_deleting_user_book(
+def test_generate_ai_suggestion_after_deleting_user_book(
     user_book_data, access_token, book_in_db, db_session, monkeypatch
 ):
     user_book_response = client.post(
@@ -115,7 +115,7 @@ def test_set_ai_suggestion_after_deleting_user_book(
     )
 
     response = client.post(
-        f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion",
+        f"/users/me/books/{book_id}/insights/{insight_id}/ai-suggestion",
         headers={"Authorization": f"Bearer {access_token}"},
     )
     assert response.status_code == 201
@@ -165,7 +165,7 @@ def test_regenerate_ai_suggestion(
     monkeypatch.setattr(
         ai_suggestion_service, "generate_ai_suggestion", fake_first_generation
     )
-    url = f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion"
+    url = f"/users/me/books/{book_id}/insights/{insight_id}/ai-suggestion"
     first_response = client.post(
         url, headers={"Authorization": f"Bearer {access_token}"}
     )
@@ -212,12 +212,12 @@ def test_regenerate_ai_suggestion(
     assert suggestion_ids == [suggestion_id]
 
 
-def test_set_ai_suggestion_return_without_access_token_error():
-    response = client.post("/users/me/books/1/insights/1/ai_suggestion")
+def test_generate_ai_suggestion_return_without_access_token_error():
+    response = client.post("/users/me/books/1/insights/1/ai-suggestion")
     assert response.status_code == 401
 
 
-def test_set_ai_suggestion_return_without_insight_error(
+def test_generate_ai_suggestion_return_without_insight_error(
     user_book_data, access_token, db_session
 ):
     create_user_book_response = client.post(
@@ -229,14 +229,14 @@ def test_set_ai_suggestion_return_without_insight_error(
     book_id = create_user_book_response.json()["book_id"]
 
     response = client.post(
-        f"/users/me/books/{book_id}/insights/1/ai_suggestion",
+        f"/users/me/books/{book_id}/insights/1/ai-suggestion",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
     assert response.status_code == 404
 
 
-def test_set_ai_suggestion_return_other_access_token_error(
+def test_generate_ai_suggestion_return_other_access_token_error(
     user_book_data,
     access_token,
     other_access_token,
@@ -259,14 +259,14 @@ def test_set_ai_suggestion_return_other_access_token_error(
     insight_id = create_insight_response.json()["id"]
 
     response = client.post(
-        f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion",
+        f"/users/me/books/{book_id}/insights/{insight_id}/ai-suggestion",
         headers={"Authorization": f"Bearer {other_access_token}"},
     )
 
     assert response.status_code == 404
 
 
-def test_set_ai_suggestion_return_AISuggestionGenerationError(
+def test_generate_ai_suggestion_return_AISuggestionGenerationError(
     user_book_data, access_token, monkeypatch, db_session
 ):
     create_user_book_response = client.post(
@@ -296,7 +296,7 @@ def test_set_ai_suggestion_return_AISuggestionGenerationError(
     )
 
     response = client.post(
-        f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion",
+        f"/users/me/books/{book_id}/insights/{insight_id}/ai-suggestion",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -307,7 +307,7 @@ def test_set_ai_suggestion_return_AISuggestionGenerationError(
     assert ai_suggestion is None
 
 
-def test_set_ai_suggestion_return_AISuggestionSaveError(
+def test_generate_ai_suggestion_return_AISuggestionSaveError(
     user_book_data, access_token, db_session, monkeypatch
 ):
     create_user_book_response = client.post(
@@ -337,7 +337,7 @@ def test_set_ai_suggestion_return_AISuggestionSaveError(
     )
 
     response = client.post(
-        f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion",
+        f"/users/me/books/{book_id}/insights/{insight_id}/ai-suggestion",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -348,7 +348,7 @@ def test_set_ai_suggestion_return_AISuggestionSaveError(
     assert ai_suggestion is None
 
 
-def test_set_ai_suggestion_return_IntegrityError(
+def test_generate_ai_suggestion_return_IntegrityError(
     user_book_data, access_token, db_session, monkeypatch
 ):
     create_user_book_response = client.post(
@@ -400,7 +400,7 @@ def test_set_ai_suggestion_return_IntegrityError(
         patch.setattr(Session, "commit", fake_commit)
         patch.setattr(Session, "rollback", record_rollback)
         response = client.post(
-            f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion",
+            f"/users/me/books/{book_id}/insights/{insight_id}/ai-suggestion",
             headers={"Authorization": f"Bearer {access_token}"},
         )
 
@@ -421,11 +421,11 @@ def test_set_ai_suggestion_return_IntegrityError(
         (1, -1),
     ],
 )
-def test_set_ai_suggestion_returns_422_for_invalid_path_ids(
+def test_generate_ai_suggestion_returns_422_for_invalid_path_ids(
     book_id, insight_id, access_token
 ):
     response = client.post(
-        f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion",
+        f"/users/me/books/{book_id}/insights/{insight_id}/ai-suggestion",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -495,7 +495,7 @@ def test_generate_ai_suggestion_returns_parsed_output(monkeypatch):
     assert suggestion == expected_suggestion
 
 
-def test_read_users_ai_suggestion(user_book_data, access_token, db_session):
+def test_get_ai_suggestion(user_book_data, access_token, db_session):
     create_user_book_response = client.post(
         "/users/me/books",
         json=user_book_data,
@@ -526,7 +526,7 @@ def test_read_users_ai_suggestion(user_book_data, access_token, db_session):
     db_session.refresh(ai_suggestion)
 
     response = client.get(
-        f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion",
+        f"/users/me/books/{book_id}/insights/{insight_id}/ai-suggestion",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -541,7 +541,7 @@ def test_read_users_ai_suggestion(user_book_data, access_token, db_session):
     assert response_data["next_action"] == "テストD"
 
 
-def test_read_ai_suggestion_after_deleting_user_book(
+def test_get_ai_suggestion_after_deleting_user_book(
     user_book_data, access_token, db_session
 ):
     user_book_response = client.post(
@@ -581,7 +581,7 @@ def test_read_ai_suggestion_after_deleting_user_book(
     assert db_session.get(UserBook, user_book_id) is None
 
     response = client.get(
-        f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion",
+        f"/users/me/books/{book_id}/insights/{insight_id}/ai-suggestion",
         headers={"Authorization": f"Bearer {access_token}"},
     )
     assert response.status_code == 200
@@ -594,7 +594,7 @@ def test_read_ai_suggestion_after_deleting_user_book(
     assert response_data["next_action"] == "テストD"
 
 
-def test_read_users_ai_suggestion_returns_404_when_not_registered(
+def test_get_ai_suggestion_returns_404_when_not_registered(
     user_book_data, access_token
 ):
     create_user_book_response = client.post(
@@ -614,15 +614,15 @@ def test_read_users_ai_suggestion_returns_404_when_not_registered(
     insight_id = create_insight_response.json()["id"]
 
     response = client.get(
-        f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion",
+        f"/users/me/books/{book_id}/insights/{insight_id}/ai-suggestion",
         headers={"Authorization": f"Bearer {access_token}"},
     )
     assert response.status_code == 404
     assert response.json() == {"detail": "AI提案が保存されていません。"}
 
 
-def test_read_users_ai_suggestion_returns_401_without_access_token():
-    response = client.get("/users/me/books/1/insights/1/ai_suggestion")
+def test_get_ai_suggestion_returns_401_without_access_token():
+    response = client.get("/users/me/books/1/insights/1/ai-suggestion")
 
     assert response.status_code == 401
 
@@ -636,18 +636,18 @@ def test_read_users_ai_suggestion_returns_401_without_access_token():
         (1, -1),
     ],
 )
-def test_read_users_ai_suggestion_returns_422_for_invalid_path_ids(
+def test_get_ai_suggestion_returns_422_for_invalid_path_ids(
     book_id, insight_id, access_token
 ):
     response = client.get(
-        f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion",
+        f"/users/me/books/{book_id}/insights/{insight_id}/ai-suggestion",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
     assert response.status_code == 422
 
 
-def test_read_users_ai_suggestion_returns_404_for_other_user(
+def test_get_ai_suggestion_returns_404_for_other_user(
     user_book_data, access_token, other_access_token, db_session
 ):
     create_user_book_response = client.post(
@@ -677,7 +677,7 @@ def test_read_users_ai_suggestion_returns_404_for_other_user(
     db_session.commit()
 
     response = client.get(
-        f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion",
+        f"/users/me/books/{book_id}/insights/{insight_id}/ai-suggestion",
         headers={"Authorization": f"Bearer {other_access_token}"},
     )
 
@@ -685,7 +685,7 @@ def test_read_users_ai_suggestion_returns_404_for_other_user(
     assert response.json() == {"detail": "AI提案が保存されていません。"}
 
 
-def test_read_users_ai_suggestion_returns_404_for_different_book(
+def test_get_ai_suggestion_returns_404_for_different_book(
     user_book_data, book_data, access_token, db_session
 ):
     create_user_book_response = client.post(
@@ -731,7 +731,7 @@ def test_read_users_ai_suggestion_returns_404_for_different_book(
     )
     try:
         response = client.get(
-            f"/users/me/books/{different_book.id}/insights/{insight_id}/ai_suggestion",
+            f"/users/me/books/{different_book.id}/insights/{insight_id}/ai-suggestion",
             headers={"Authorization": f"Bearer {access_token}"},
         )
 
@@ -775,7 +775,7 @@ def test_delete_ai_suggestion(user_book_data, access_token, db_session):
     ai_suggestion_id = ai_suggestion.id
 
     response = client.delete(
-        f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion",
+        f"/users/me/books/{book_id}/insights/{insight_id}/ai-suggestion",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -826,7 +826,7 @@ def test_delete_ai_suggestion_after_deleting_user_book(
     assert db_session.get(UserBook, user_book_id) is None
 
     response = client.delete(
-        f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion",
+        f"/users/me/books/{book_id}/insights/{insight_id}/ai-suggestion",
         headers={"Authorization": f"Bearer {access_token}"},
     )
     assert response.status_code == 204
@@ -916,7 +916,7 @@ def test_delete_ai_suggestion_returns_404_when_not_registered(
     insight_id = create_insight_response.json()["id"]
 
     response = client.delete(
-        f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion",
+        f"/users/me/books/{book_id}/insights/{insight_id}/ai-suggestion",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -925,7 +925,7 @@ def test_delete_ai_suggestion_returns_404_when_not_registered(
 
 
 def test_delete_ai_suggestion_returns_401_without_access_token():
-    response = client.delete("/users/me/books/1/insights/1/ai_suggestion")
+    response = client.delete("/users/me/books/1/insights/1/ai-suggestion")
 
     assert response.status_code == 401
 
@@ -943,7 +943,7 @@ def test_delete_ai_suggestion_returns_422_for_invalid_path_ids(
     book_id, insight_id, access_token
 ):
     response = client.delete(
-        f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion",
+        f"/users/me/books/{book_id}/insights/{insight_id}/ai-suggestion",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
@@ -982,7 +982,7 @@ def test_delete_ai_suggestion_returns_404_for_other_user(
     ai_suggestion_id = ai_suggestion.id
 
     response = client.delete(
-        f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion",
+        f"/users/me/books/{book_id}/insights/{insight_id}/ai-suggestion",
         headers={"Authorization": f"Bearer {other_access_token}"},
     )
 
@@ -1041,7 +1041,7 @@ def test_delete_ai_suggestion_returns_404_for_different_book(
     )
     try:
         response = client.delete(
-            f"/users/me/books/{different_book.id}/insights/{insight_id}/ai_suggestion",
+            f"/users/me/books/{different_book.id}/insights/{insight_id}/ai-suggestion",
             headers={"Authorization": f"Bearer {access_token}"},
         )
 
@@ -1096,7 +1096,7 @@ def test_regenerate_ai_suggestion_preserves_existing_suggestion_on_generation_er
     )
 
     response = client.post(
-        f"/users/me/books/{book_id}/insights/{insight_id}/ai_suggestion",
+        f"/users/me/books/{book_id}/insights/{insight_id}/ai-suggestion",
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
