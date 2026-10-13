@@ -21,6 +21,12 @@ router = APIRouter(prefix="/users/me/books", tags=["ai-suggestions"])
     "/{book_id}/insights/{insight_id}/ai-suggestion",
     response_model=AISuggestionResponse,
     status_code=status.HTTP_201_CREATED,
+    responses={
+        status.HTTP_200_OK: {
+            "model": AISuggestionResponse,
+            "description": "既存のAI提案を再生成して更新しました。",
+        },
+    },
 )
 def generate_ai_suggestion(
     book_id: Annotated[int, Path(gt=0)],

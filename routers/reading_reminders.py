@@ -20,6 +20,12 @@ router = APIRouter(prefix="/users/me/books", tags=["reading-reminders"])
     "/{book_id}/reminder",
     response_model=ReadingReminderResponse,
     status_code=status.HTTP_201_CREATED,
+    responses={
+        status.HTTP_200_OK: {
+            "model": ReadingReminderResponse,
+            "description": "既存のリマインダーを再設定しました。",
+        },
+    },
 )
 def set_user_book_reading_reminder(
     book_id: Annotated[int, Path(gt=0)],
