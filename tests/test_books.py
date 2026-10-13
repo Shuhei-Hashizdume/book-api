@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from main import app
-from models import Book, BookRating
+from models import Book, BookRating, UserBook
 
 client = TestClient(app)
 
@@ -225,6 +225,74 @@ def test_delete_book_rejects_invalid_book_id(book_id, admin_access_token):
     )
     assert response.status_code == 422
     assert response.json()["detail"][0]["loc"] == ["path", "book_id"]
+
+
+def test_delete_book_returns_conflict_when_book_is_in_user_list(
+    user_book_data, access_token, admin_access_token, db_session
+):
+    post_response = client.post(
+        "/users/me/books",
+        json=user_book_data,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert post_response.status_code == 201
+    book_id = post_response.json()["book_id"]
+    user_book_id = post_response.json()["id"]
+
+    delete_response = client.delete(
+        f"/books/{book_id}",
+        headers={"Authorization": f"Bearer {admin_access_token}"},
+    )
+    assert delete_response.status_code == 409
+    assert delete_response.json() == {
+        "detail": "この本はユーザーの記録で使用されているため、削除できません。"
+    }
+
+    book_statement = select(Book).where(Book.id == book_id)
+    assert db_session.scalar(book_statement) is not None
+    user_book_statement = select(UserBook).where(UserBook.id == user_book_id)
+    assert db_session.scalar(user_book_statement) is not None
+
+
+def test_delete_book_returns_conflict_when_rating_exists(
+    book_in_db, registered_user, admin_access_token, db_session
+):
+    book_id = book_in_db.id
+    user_id = registered_user.id
+    book_rating = BookRating(
+        user_id=user_id,
+        book_id=book_id,
+        recommendation_score=5,
+    )
+    db_session.add(book_rating)
+    db_session.commit()
+    db_session.refresh(book_rating)
+    book_rating_id = book_rating.id
+
+    try:
+        user_book_statement = select(UserBook).where(
+            UserBook.user_id == user_id, UserBook.book_id == book_id
+        )
+        assert db_session.scalar(user_book_statement) is None
+
+        delete_response = client.delete(
+            f"/books/{book_id}",
+            headers={"Authorization": f"Bearer {admin_access_token}"},
+        )
+        assert delete_response.status_code == 409
+        assert delete_response.json() == {
+            "detail": "この本はユーザーの記録で使用されているため、削除できません。"
+        }
+
+        book_statement = select(Book).where(Book.id == book_id)
+        assert db_session.scalar(book_statement) is not None
+        book_rating_statement = select(BookRating).where(BookRating.id == book_rating_id)
+        saved_rating = db_session.scalar(book_rating_statement)
+        assert saved_rating is not None
+        assert saved_rating.recommendation_score == 5
+    finally:
+        db_session.delete(book_rating)
+        db_session.commit()
 
 
 def test_delete_book(book_data, admin_access_token, db_session):

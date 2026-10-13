@@ -72,6 +72,19 @@ def list_books(db: SessionDep):
     return result
 
 
+@router.get("/{book_id}/related", response_model=list[RelatedBookResponse])
+def list_related_books(book_id: Annotated[int, Path(gt=0)], db: SessionDep):
+    related_books = get_related_books(book_id, db)
+
+    if related_books is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="本が見つかりません。",
+        )
+
+    return related_books
+
+
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=BookResponse)
 def create_book(book_data: BookCreate, db: SessionDep, admin_user: AdminUserDep):
     book = Book(
@@ -129,17 +142,11 @@ def delete_book(
             status_code=status.HTTP_404_NOT_FOUND, detail="本がありません。"
         )
     db.delete(target_book)
-    db.commit()
-
-
-@router.get("/{book_id}/related", response_model=list[RelatedBookResponse])
-def list_related_books(book_id: Annotated[int, Path(gt=0)], db: SessionDep):
-    related_books = get_related_books(book_id, db)
-
-    if related_books is None:
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="本が見つかりません。",
+            status_code=status.HTTP_409_CONFLICT,
+            detail="この本はユーザーの記録で使用されているため、削除できません。",
         )
-
-    return related_books
