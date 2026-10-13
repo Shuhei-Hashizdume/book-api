@@ -26,6 +26,20 @@ from services.google_books import get_google_book
 router = APIRouter(prefix="/users/me/books", tags=["user-books"])
 
 
+def _build_user_book_response(
+    user_book: UserBook, book_rating: BookRating | None
+) -> UserBookResponse:
+    return UserBookResponse(
+        id=user_book.id,
+        book_id=user_book.book_id,
+        priority=user_book.priority,
+        status=user_book.status,
+        recommendation_score=(
+            book_rating.recommendation_score if book_rating is not None else None
+        ),
+    )
+
+
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=UserBookResponse)
 def add_book_to_user_list(
     user_book_data: UserBookCreate, db: SessionDep, current_user: CurrentUserDep
@@ -54,15 +68,7 @@ def add_book_to_user_list(
     )
     book_rating = db.scalar(book_rating_statement)
 
-    return UserBookResponse(
-        id=user_book.id,
-        book_id=user_book.book_id,
-        priority=user_book.priority,
-        status=user_book.status,
-        recommendation_score=(
-            book_rating.recommendation_score if book_rating is not None else None
-        ),
-    )
+    return _build_user_book_response(user_book, book_rating)
 
 
 @router.get("", response_model=list[UserBookListItem])
@@ -176,15 +182,7 @@ def update_user_book_priority(
     )
     book_rating = db.scalar(book_rating_statement)
 
-    return UserBookResponse(
-        id=user_book.id,
-        book_id=user_book.book_id,
-        priority=user_book.priority,
-        status=user_book.status,
-        recommendation_score=(
-            book_rating.recommendation_score if book_rating is not None else None
-        ),
-    )
+    return _build_user_book_response(user_book, book_rating)
 
 
 @router.delete("/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -267,15 +265,7 @@ def update_user_book_status(
     if book_rating is not None:
         db.refresh(book_rating)
 
-    return UserBookResponse(
-        id=user_book.id,
-        book_id=user_book.book_id,
-        priority=user_book.priority,
-        status=user_book.status,
-        recommendation_score=(
-            book_rating.recommendation_score if book_rating is not None else None
-        ),
-    )
+    return _build_user_book_response(user_book, book_rating)
 
 
 @router.post(
@@ -366,15 +356,7 @@ def add_book_to_user_list_from_search(
     )
     book_rating = db.scalar(book_rating_statement)
 
-    return UserBookResponse(
-        id=user_book.id,
-        book_id=user_book.book_id,
-        priority=user_book.priority,
-        status=user_book.status,
-        recommendation_score=(
-            book_rating.recommendation_score if book_rating is not None else None
-        ),
-    )
+    return _build_user_book_response(user_book, book_rating)
 
 
 @router.patch("/{book_id}/book-rating", response_model=BookRatingResponse)
