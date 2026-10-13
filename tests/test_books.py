@@ -206,6 +206,27 @@ def test_update_book(book_in_db, admin_access_token, db_session):
     assert update_book.title == "テストB"
 
 
+@pytest.mark.parametrize("book_id", ["abc", 0, -1])
+def test_update_book_rejects_invalid_book_id(book_id, admin_access_token):
+    response = client.patch(
+        f"/books/{book_id}",
+        json={"title": "テストB"},
+        headers={"Authorization": f"Bearer {admin_access_token}"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["path", "book_id"]
+
+
+@pytest.mark.parametrize("book_id", ["abc", 0, -1])
+def test_delete_book_rejects_invalid_book_id(book_id, admin_access_token):
+    response = client.delete(
+        f"/books/{book_id}",
+        headers={"Authorization": f"Bearer {admin_access_token}"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["path", "book_id"]
+
+
 def test_delete_book(book_data, admin_access_token, db_session):
     post_response = client.post(
         "/books",

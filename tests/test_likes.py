@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -8,6 +9,26 @@ from models import Like, ReadingPost, User
 from security import create_access_token, hash_password
 
 client = TestClient(app)
+
+
+@pytest.mark.parametrize("reading_post_id", ["abc", 0, -1])
+def test_create_like_rejects_invalid_post_id(reading_post_id, access_token):
+    response = client.post(
+        f"/reading-posts/{reading_post_id}/likes",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["path", "reading_post_id"]
+
+
+@pytest.mark.parametrize("reading_post_id", ["abc", 0, -1])
+def test_delete_like_rejects_invalid_post_id(reading_post_id, access_token):
+    response = client.delete(
+        f"/reading-posts/{reading_post_id}/likes",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["path", "reading_post_id"]
 
 
 def test_create_like(

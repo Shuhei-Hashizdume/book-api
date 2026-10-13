@@ -153,7 +153,7 @@ def get_user_book_detail(
 def update_user_book_priority(
     db: SessionDep,
     current_user: CurrentUserDep,
-    book_id: int,
+    book_id: Annotated[int, Path(gt=0)],
     user_book_data: UserBookUpdate,
 ):
     statement = select(UserBook).where(
@@ -188,7 +188,9 @@ def update_user_book_priority(
 
 
 @router.delete("/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user_book(book_id: int, current_user: CurrentUserDep, db: SessionDep):
+def delete_user_book(
+    book_id: Annotated[int, Path(gt=0)], current_user: CurrentUserDep, db: SessionDep
+):
     statement = select(UserBook).where(
         UserBook.book_id == book_id, UserBook.user_id == current_user.id
     )
@@ -204,7 +206,7 @@ def delete_user_book(book_id: int, current_user: CurrentUserDep, db: SessionDep)
 
 @router.patch("/{book_id}/status", response_model=UserBookResponse)
 def update_user_book_status(
-    book_id: int,
+    book_id: Annotated[int, Path(gt=0)],
     db: SessionDep,
     current_user: CurrentUserDep,
     status_data: UserBookStatusUpdate,

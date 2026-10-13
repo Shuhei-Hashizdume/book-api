@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Path, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
@@ -14,7 +16,11 @@ router = APIRouter(prefix="/reading-posts", tags=["likes"])
     status_code=status.HTTP_201_CREATED,
     response_model=LikeResponse,
 )
-def create_like(reading_post_id: int, current_user: CurrentUserDep, db: SessionDep):
+def create_like(
+    reading_post_id: Annotated[int, Path(gt=0)],
+    current_user: CurrentUserDep,
+    db: SessionDep,
+):
     statement = select(ReadingPost).where(ReadingPost.id == reading_post_id)
     reading_post = db.scalar(statement)
 
@@ -58,7 +64,11 @@ def create_like(reading_post_id: int, current_user: CurrentUserDep, db: SessionD
 
 
 @router.delete("/{reading_post_id}/likes", status_code=status.HTTP_204_NO_CONTENT)
-def delete_like(reading_post_id: int, current_user: CurrentUserDep, db: SessionDep):
+def delete_like(
+    reading_post_id: Annotated[int, Path(gt=0)],
+    current_user: CurrentUserDep,
+    db: SessionDep,
+):
     statement = select(ReadingPost).where(ReadingPost.id == reading_post_id)
     reading_post = db.scalar(statement)
 
