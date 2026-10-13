@@ -32,7 +32,8 @@ Phase 12：機能間の整合性を確認する
 
 Step 12-1：主要ユーザーフローの確認が完了。
 Swagger UIで検索から別ユーザーによる公開投稿の発見まで確認しました。
-Step 12-2：DBリレーションを見直しています。読みたい一覧・完読一覧の分離と気づきの独立保存は、PR #21でmainへマージ済みです。
+Step 12-2で読みたい一覧・完読一覧の分離、気づき・投稿・評価・完読記録の独立保存、退会時の連動削除を確認しました。
+Step 12-3：API設計を見直しています。関数名・URLの整理はPR #26でマージ済みです。現在はID入力検証の統一を確認しています。
 
 ---
 
@@ -392,13 +393,15 @@ CompletedBook（user_id・book_idの組み合わせが一意）で完読記録�
 
 本の詳細・一覧・本人の一覧・既存本のリスト登録・検索結果からの登録を、get_book_detail / list_books / list_user_books / add_book_to_user_list / add_book_to_user_list_from_searchへ変更しました。検索と共通Book作成は既存名を保持し、対応するテスト関数名28件も揃えました。2026-10-12にtests/test_books.pyとtests/test_user_books.pyの全69テストが成功しました（2.70秒）。追加の命名・URL整理は下記まで完了しました。
 
-優先度変更をPATCH /users/me/books/{book_id}/priorityへ変更し、評価変更は/book-ratingへ一本化しました。旧/recommendation-scoreのAPI・専用スキーマ・専用6テストケースを削除し、投稿の評価保持テストも更新しました。評価未登録の404メッセージを判定内容に揃えました。AI提案のURLは/ai-suggestion（POST・GET・DELETE）に統一し、関数名はgenerate_ai_suggestion / get_ai_suggestion / delete_ai_suggestionに変更しました。気づき作成はcreate_insight、気づき・フォロー・関連本・タイムラインの一覧取得はlist_に揃え、対応するテスト名も変更しました。2026-10-12に全314テストが成功しました（12.45秒）。受講者がSwagger UIで/priority、/ai-suggestion、/book-ratingの表示と旧/recommendation-scoreがないことを確認しました。変更後のURLでの実操作は未確認です。次はコミット・PR・マージを行います。Phase 12全体の見直し完了はまだ判断していません。
+優先度変更をPATCH /users/me/books/{book_id}/priorityへ変更し、評価変更は/book-ratingへ一本化しました。旧/recommendation-scoreのAPI・専用スキーマ・専用6テストケースを削除し、投稿の評価保持テストも更新しました。評価未登録の404メッセージを判定内容に揃えました。AI提案のURLは/ai-suggestion（POST・GET・DELETE）に統一し、関数名はgenerate_ai_suggestion / get_ai_suggestion / delete_ai_suggestionに変更しました。気づき作成はcreate_insight、気づき・フォロー・関連本・タイムラインの一覧取得はlist_に揃え、対応するテスト名も変更しました。2026-10-12に全314テストが成功しました（12.45秒）。受講者がSwagger UIで/priority、/ai-suggestion、/book-ratingの表示と旧/recommendation-scoreがないことを確認しました。変更後のURLでの実操作は未確認です。PR #26をmainへマージ（5efd35d）しました。GitHub上のmainとローカルmainの一致、ローカル・リモート作業ブランチの削除、進捗追記前の作業ツリーがクリーンであることを確認しました。GitHub Actionsの結果は未確認です。続いてID入力検証を下記まで統一しました。Phase 12全体の見直し完了はまだ判断していません。
+
+全APIのパスIDを正の整数（Path(gt=0)）に統一し、リスト登録JSONのbook_idにもField(gt=0)を追加しました。形式不正・0・負のIDは422、存在しない正のIDは既存仕様に従って処理します（個別対象は404、気づき一覧は空リスト）。不正IDの66ケースを追加し、登録の404テストは0から正の未登録IDへ変更しました。OpenAPI上のパスID33項目に制約漏れがないことを確認し、2026-10-13に全380テストが成功しました（14.76秒）。次は入力検証変更のコミット・PR・マージを行い、その後ステータスコード・例外メッセージの残る見直しへ進みます。
 
 ---
 
 # 再開地点
 
-**Phase 12 / Step 12-2：DBリレーションの見直し**
+**Phase 12 / Step 12-3：API設計の見直し**
 
 主要ユーザーフローはSwagger UIで確認済みです。読みたい一覧は未読・読書中、完読一覧は完読のみを返し、list_type省略時は読みたい一覧を返します。
 気づきはUser・Bookへ直接紐づけ、本の登録削除後も気づき・AI提案を保持します。気づきには本ID・タイトルを返し、明示的に気づきを削除するとAI提案も削除します。気づきが参照するBook本体の削除は拒否します。

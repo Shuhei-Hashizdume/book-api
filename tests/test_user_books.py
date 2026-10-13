@@ -127,11 +127,22 @@ def test_add_book_to_user_list_conflict_with_duplicate_book(user_book_data, acce
 def test_add_book_to_user_list_not_found(access_token):
     response = client.post(
         "/users/me/books",
-        json={"book_id": 0, "priority": "high"},
+        json={"book_id": 999999, "priority": "high"},
         headers={"Authorization": f"Bearer {access_token}"},
     )
 
     assert response.status_code == 404
+
+
+@pytest.mark.parametrize("book_id", ["abc", 0, -1])
+def test_add_book_to_user_list_rejects_invalid_book_id(book_id, access_token):
+    response = client.post(
+        "/users/me/books",
+        json={"book_id": book_id, "priority": "high"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["body", "book_id"]
 
 
 def test_add_book_to_user_list_unauthorized_without_token(user_book_data):
@@ -443,6 +454,17 @@ def test_update_user_book_priority_not_found(book_in_db, access_token, db_sessio
     assert response.status_code == 404
 
 
+@pytest.mark.parametrize("book_id", ["abc", 0, -1])
+def test_update_user_book_priority_rejects_invalid_book_id(book_id, access_token):
+    response = client.patch(
+        f"/users/me/books/{book_id}/priority",
+        json={"priority": "medium"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["path", "book_id"]
+
+
 def test_delete_user_book(db_session, access_token, user_book_data):
     post_response = client.post(
         "/users/me/books",
@@ -464,6 +486,16 @@ def test_delete_user_book(db_session, access_token, user_book_data):
 
     book = db_session.get(Book, target_book_id)
     assert book is not None
+
+
+@pytest.mark.parametrize("book_id", ["abc", 0, -1])
+def test_delete_user_book_rejects_invalid_book_id(book_id, access_token):
+    response = client.delete(
+        f"/users/me/books/{book_id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["path", "book_id"]
 
 
 def test_update_user_book_status_to_reading(user_book_data, access_token, db_session):
@@ -555,6 +587,17 @@ def test_update_user_book_status_not_found(book_in_db, access_token):
         headers={"Authorization": f"Bearer {access_token}"},
     )
     assert response.status_code == 404
+
+
+@pytest.mark.parametrize("book_id", ["abc", 0, -1])
+def test_update_user_book_status_rejects_invalid_book_id(book_id, access_token):
+    response = client.patch(
+        f"/users/me/books/{book_id}/status",
+        json={"status": "reading"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["path", "book_id"]
 
 
 def test_update_user_book_status_unauthorized(book_in_db):

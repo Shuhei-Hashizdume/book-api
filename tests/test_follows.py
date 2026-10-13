@@ -11,6 +11,26 @@ from security import create_access_token
 client = TestClient(app)
 
 
+@pytest.mark.parametrize("followed_user_id", ["abc", 0, -1])
+def test_create_follow_rejects_invalid_user_id(followed_user_id, access_token):
+    response = client.post(
+        f"/users/{followed_user_id}/follow",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["path", "followed_user_id"]
+
+
+@pytest.mark.parametrize("followed_user_id", ["abc", 0, -1])
+def test_delete_follow_rejects_invalid_user_id(followed_user_id, access_token):
+    response = client.delete(
+        f"/users/{followed_user_id}/follow",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["path", "followed_user_id"]
+
+
 def test_create_follow(access_token, db_session, other_user, registered_user):
     response = client.post(
         f"/users/{other_user.id}/follow",

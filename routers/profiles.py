@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Path, status
 
 from dependencies import SessionDep
 from schemas.profiles import UserProfileResponse
@@ -8,7 +10,7 @@ router = APIRouter(prefix="/users", tags=["profiles"])
 
 
 @router.get("/{user_id}/profile", response_model=UserProfileResponse)
-def read_user_profile(user_id: int, db: SessionDep):
+def read_user_profile(user_id: Annotated[int, Path(gt=0)], db: SessionDep):
     user_profile = get_user_profile(user_id, db)
 
     if user_profile is None:

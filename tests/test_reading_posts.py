@@ -1035,3 +1035,56 @@ def test_create_reading_post_rejects_invalid_recommendation_reason(
     )
 
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize("book_id", ["abc", 0, -1])
+def test_create_reading_post_rejects_invalid_book_id(book_id, access_token):
+    response = client.post(
+        f"/users/me/books/{book_id}/reading-post",
+        json={"recommendation_reason": "テスト用のおすすめ理由"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["path", "book_id"]
+
+
+@pytest.mark.parametrize("book_id", ["abc", 0, -1])
+def test_get_reading_post_rejects_invalid_book_id(book_id, access_token):
+    response = client.get(
+        f"/users/me/books/{book_id}/reading-post",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["path", "book_id"]
+
+
+@pytest.mark.parametrize("book_id", ["abc", 0, -1])
+def test_update_reading_post_rejects_invalid_book_id(book_id, access_token):
+    response = client.patch(
+        f"/users/me/books/{book_id}/reading-post",
+        json={"recommendation_reason": "更新後のおすすめ理由"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["path", "book_id"]
+
+
+@pytest.mark.parametrize("book_id", ["abc", 0, -1])
+def test_delete_reading_post_rejects_invalid_book_id(book_id, access_token):
+    response = client.delete(
+        f"/users/me/books/{book_id}/reading-post",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["path", "book_id"]
+
+
+@pytest.mark.parametrize("book_id", ["abc", 0, -1])
+def test_update_reading_post_visibility_rejects_invalid_book_id(book_id, access_token):
+    response = client.patch(
+        f"/users/me/books/{book_id}/reading-post/visibility",
+        json={"is_public": False},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["path", "book_id"]

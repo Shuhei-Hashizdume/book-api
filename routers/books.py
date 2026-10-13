@@ -94,7 +94,10 @@ def create_book(book_data: BookCreate, db: SessionDep, admin_user: AdminUserDep)
 
 @router.patch("/{book_id}", response_model=BookResponse)
 def update_book(
-    book_id: int, book_data: BookUpdate, db: SessionDep, admin_user: AdminUserDep
+    book_id: Annotated[int, Path(gt=0)],
+    book_data: BookUpdate,
+    db: SessionDep,
+    admin_user: AdminUserDep,
 ):
     target_book = db.get(Book, book_id)
     if target_book is None:
@@ -117,7 +120,9 @@ def update_book(
 
 
 @router.delete("/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_book(book_id: int, db: SessionDep, admin_user: AdminUserDep):
+def delete_book(
+    book_id: Annotated[int, Path(gt=0)], db: SessionDep, admin_user: AdminUserDep
+):
     target_book = db.get(Book, book_id)
     if target_book is None:
         raise HTTPException(

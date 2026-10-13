@@ -1,4 +1,6 @@
-from fastapi import APIRouter, status
+from typing import Annotated
+
+from fastapi import APIRouter, Path, status
 from fastapi.exceptions import HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -34,7 +36,7 @@ def _build_reading_post_response(reading_post: ReadingPost) -> ReadingPostRespon
     status_code=status.HTTP_201_CREATED,
 )
 def create_reading_post(
-    book_id: int,
+    book_id: Annotated[int, Path(gt=0)],
     reading_post_data: ReadingPostCreate,
     current_user: CurrentUserDep,
     db: SessionDep,
@@ -100,7 +102,9 @@ def create_reading_post(
 
 
 @router.get("/{book_id}/reading-post", response_model=ReadingPostResponse)
-def get_reading_post(book_id: int, db: SessionDep, current_user: CurrentUserDep):
+def get_reading_post(
+    book_id: Annotated[int, Path(gt=0)], db: SessionDep, current_user: CurrentUserDep
+):
 
     reading_post_statement = select(ReadingPost).where(
         ReadingPost.user_id == current_user.id, ReadingPost.book_id == book_id
@@ -117,7 +121,7 @@ def get_reading_post(book_id: int, db: SessionDep, current_user: CurrentUserDep)
 
 @router.patch("/{book_id}/reading-post", response_model=ReadingPostResponse)
 def update_reading_post(
-    book_id: int,
+    book_id: Annotated[int, Path(gt=0)],
     update_reading_post_data: ReadingPostUpdate,
     db: SessionDep,
     current_user: CurrentUserDep,
@@ -141,7 +145,9 @@ def update_reading_post(
 
 
 @router.delete("/{book_id}/reading-post", status_code=status.HTTP_204_NO_CONTENT)
-def delete_reading_post(book_id: int, current_user: CurrentUserDep, db: SessionDep):
+def delete_reading_post(
+    book_id: Annotated[int, Path(gt=0)], current_user: CurrentUserDep, db: SessionDep
+):
 
     reading_post_statement = select(ReadingPost).where(
         ReadingPost.user_id == current_user.id, ReadingPost.book_id == book_id
@@ -159,7 +165,7 @@ def delete_reading_post(book_id: int, current_user: CurrentUserDep, db: SessionD
 
 @router.patch("/{book_id}/reading-post/visibility", response_model=ReadingPostResponse)
 def update_reading_post_visibility(
-    book_id: int,
+    book_id: Annotated[int, Path(gt=0)],
     reading_post_visibility_data: ReadingPostVisibilityUpdate,
     db: SessionDep,
     current_user: CurrentUserDep,

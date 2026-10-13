@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -8,6 +9,14 @@ from main import app
 from models import Book, BookRating, CompletedBook, Follow, ReadingPost, UserBook
 
 client = TestClient(app)
+
+
+@pytest.mark.parametrize("user_id", ["abc", 0, -1])
+def test_read_user_profile_rejects_invalid_user_id(user_id):
+    response = client.get(f"/users/{user_id}/profile")
+
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["path", "user_id"]
 
 
 def test_read_user_profile(registered_user, other_user, book_in_db, db_session):

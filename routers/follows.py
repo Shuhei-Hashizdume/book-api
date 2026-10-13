@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Path, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
@@ -14,7 +16,11 @@ router = APIRouter(prefix="/users", tags=["follows"])
     response_model=FollowResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def create_follow(followed_user_id: int, current_user: CurrentUserDep, db: SessionDep):
+def create_follow(
+    followed_user_id: Annotated[int, Path(gt=0)],
+    current_user: CurrentUserDep,
+    db: SessionDep,
+):
     statement = select(User).where(User.id == followed_user_id)
     user = db.scalar(statement)
 
@@ -58,7 +64,11 @@ def create_follow(followed_user_id: int, current_user: CurrentUserDep, db: Sessi
 
 
 @router.delete("/{followed_user_id}/follow", status_code=status.HTTP_204_NO_CONTENT)
-def delete_follow(followed_user_id: int, current_user: CurrentUserDep, db: SessionDep):
+def delete_follow(
+    followed_user_id: Annotated[int, Path(gt=0)],
+    current_user: CurrentUserDep,
+    db: SessionDep,
+):
     user_statement = select(User).where(User.id == followed_user_id)
     user = db.scalar(user_statement)
 

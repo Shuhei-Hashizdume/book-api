@@ -5,7 +5,7 @@ from schemas.books import BookDetailResponse, BookResponse
 
 
 class UserBookCreate(BaseModel):
-    book_id: int
+    book_id: int = Field(gt=0)
     priority: ReadingPriority
 
 

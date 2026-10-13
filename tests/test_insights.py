@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -5,6 +6,72 @@ from main import app
 from models import Insight, UserBook
 
 client = TestClient(app)
+
+
+@pytest.mark.parametrize("book_id", ["abc", 0, -1])
+def test_create_insight_rejects_invalid_book_id(book_id, access_token):
+    response = client.post(
+        f"/users/me/books/{book_id}/insights",
+        json={"content": "小さな挑戦が大事"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["path", "book_id"]
+
+
+@pytest.mark.parametrize("book_id", ["abc", 0, -1])
+def test_list_insights_rejects_invalid_book_id(book_id, access_token):
+    response = client.get(
+        f"/users/me/books/{book_id}/insights",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["path", "book_id"]
+
+
+@pytest.mark.parametrize(
+    "book_id, insight_id, invalid_field",
+    [
+        ("abc", 1, "book_id"),
+        (0, 1, "book_id"),
+        (-1, 1, "book_id"),
+        (1, "abc", "insight_id"),
+        (1, 0, "insight_id"),
+        (1, -1, "insight_id"),
+    ],
+)
+def test_update_insight_rejects_invalid_path_ids(
+    book_id, insight_id, invalid_field, access_token
+):
+    response = client.patch(
+        f"/users/me/books/{book_id}/insights/{insight_id}",
+        json={"content": "挑戦を続けたい"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["path", invalid_field]
+
+
+@pytest.mark.parametrize(
+    "book_id, insight_id, invalid_field",
+    [
+        ("abc", 1, "book_id"),
+        (0, 1, "book_id"),
+        (-1, 1, "book_id"),
+        (1, "abc", "insight_id"),
+        (1, 0, "insight_id"),
+        (1, -1, "insight_id"),
+    ],
+)
+def test_delete_insight_rejects_invalid_path_ids(
+    book_id, insight_id, invalid_field, access_token
+):
+    response = client.delete(
+        f"/users/me/books/{book_id}/insights/{insight_id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["loc"] == ["path", invalid_field]
 
 
 def test_create_insight_for_other_users_book_returns_not_found(

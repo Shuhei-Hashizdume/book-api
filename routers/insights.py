@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Path, status
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
@@ -15,7 +17,7 @@ router = APIRouter(prefix="/users/me/books", tags=["insights"])
     status_code=status.HTTP_201_CREATED,
 )
 def create_insight(
-    book_id: int,
+    book_id: Annotated[int, Path(gt=0)],
     insights_data: InsightCreate,
     db: SessionDep,
     current_user: CurrentUserDep,
@@ -49,7 +51,9 @@ def create_insight(
 
 
 @router.get("/{book_id}/insights", response_model=list[InsightResponse])
-def list_insights(book_id: int, current_user: CurrentUserDep, db: SessionDep):
+def list_insights(
+    book_id: Annotated[int, Path(gt=0)], current_user: CurrentUserDep, db: SessionDep
+):
     insight_statement = (
         select(Insight)
         .options(joinedload(Insight.book))
@@ -72,8 +76,8 @@ def list_insights(book_id: int, current_user: CurrentUserDep, db: SessionDep):
 
 @router.patch("/{book_id}/insights/{insight_id}", response_model=InsightResponse)
 def update_insight(
-    book_id: int,
-    insight_id: int,
+    book_id: Annotated[int, Path(gt=0)],
+    insight_id: Annotated[int, Path(gt=0)],
     insight_data: InsightUpdate,
     current_user: CurrentUserDep,
     db: SessionDep,
@@ -108,7 +112,10 @@ def update_insight(
     "/{book_id}/insights/{insight_id}", status_code=status.HTTP_204_NO_CONTENT
 )
 def delete_insight(
-    book_id: int, insight_id: int, current_user: CurrentUserDep, db: SessionDep
+    book_id: Annotated[int, Path(gt=0)],
+    insight_id: Annotated[int, Path(gt=0)],
+    current_user: CurrentUserDep,
+    db: SessionDep,
 ):
     insight_statement = select(Insight).where(
         Insight.user_id == current_user.id,
